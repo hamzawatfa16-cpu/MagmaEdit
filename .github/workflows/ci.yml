@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore MagmaEdit.slnx
+
+      - name: Verify formatting
+        run: dotnet format MagmaEdit.slnx --verify-no-changes --no-restore
+
+      - name: Build
+        run: dotnet build MagmaEdit.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test MagmaEdit.slnx --configuration Release --no-build --verbosity normal
