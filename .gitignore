@@ -31,14 +31,6 @@ local/
 *.pfx
 *.key
 
-# User media/project data must never enter source control
+# User workspace data — never commit the user's live media/project library
 Content Creation/
 content-creation/
-*.mp4
-*.mov
-*.mkv
-*.avi
-*.webm
-*.mp3
-*.wav
-*.flac
