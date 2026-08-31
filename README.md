@@ -4,34 +4,60 @@ MagmaEdit is a Windows-first video editor designed for normal editing workflows 
 
 ## Project status
 
-Early architecture stage. The repository is intentionally kept small until the upstream foundation and licensing are fully audited.
+**Foundation stage — first executable core scaffold.** The repository now contains the first MagmaEdit-owned Core project, workspace contract, reversible edit history, tests, and Windows CI gates. The Sprocket foundation remains under controlled audit; large upstream source import is deliberately not mixed into the repository until the dependency and licensing boundary is approved.
 
-## Goals
+## Product direction
 
-- Clean, maintainable Windows desktop video editor.
-- CapCut/Adobe-style workflow without unnecessary complexity.
+- CapCut/Adobe-style editing workflow without unnecessary complexity.
+- Windows desktop application first.
 - Local-first media and project storage.
-- A `Content Creation` workspace for user media, projects, and exports.
-- A command-based editing core with reliable Undo/Redo.
-- AI control through an integration layer based on MCP rather than simulated mouse/keyboard automation.
-- Strict formatting, analysis, tests, dependency checks, and CI gates.
+- A predictable `Videos\Content Creation` workspace for Media, Projects, Exports, and Cache.
+- One command layer for UI edits, automation, and AI edits.
+- Reliable Undo/Redo shared by user and AI actions.
+- MCP-based AI integration rather than simulated mouse/keyboard control.
+- Future ChatGPT/Claude/other AI-client integrations built above the same editing engine.
+
+## Current repository structure
+
+```text
+MagmaEdit/
+├── src/
+│   └── MagmaEdit.Core/
+│       ├── Editing/
+│       └── Workspace/
+├── tests/
+│   └── MagmaEdit.Core.Tests/
+├── docs/
+├── .github/
+│   └── workflows/
+├── MagmaEdit.slnx
+├── Directory.Build.props
+├── .editorconfig
+└── global.json
+```
 
 ## Engineering rules
 
-1. Do not add a dependency without a documented reason.
-2. Do not mix UI, editing-domain logic, media/codec logic, authentication, and AI integration in the same project/module.
-3. Every user-visible feature must have tests at the appropriate layer.
-4. Warnings and static-analysis findings are treated as errors where practical.
-5. CI is a required gate before merging.
-6. Third-party licenses and notices must be tracked as dependencies change.
-7. No secrets are committed to Git.
+See [docs/ENGINEERING-RULES.md](docs/ENGINEERING-RULES.md).
 
-## Foundation audit
+The project uses nullable analysis, warnings-as-errors, analyzers, deterministic builds, formatting verification, tests, and Windows CI from the start.
 
-The current candidate foundation is SprocketVideo/Sprocket. It is being audited before any source is copied or adapted.
+## Workspace
 
-The audit covers architecture, build requirements, tests, MCP implementation, packaging, storage, dependencies, and licenses.
+See [docs/WORKSPACE.md](docs/WORKSPACE.md).
 
-## Repository structure
+Default workspace:
 
-The final structure will follow the dependency boundaries of the chosen foundation rather than forcing a premature layout.
+```text
+%USERPROFILE%\Videos\Content Creation\
+├── Media/
+├── Projects/
+├── Exports/
+└── Cache/
+```
+
+## Open-source foundation
+
+The current preferred foundation is [SprocketVideo/Sprocket](https://github.com/SprocketVideo/Sprocket). Its architecture is a strong fit for MagmaEdit because it already separates the editing core, media, render, audio, playback, persistence, plugins, MCP, and desktop application layers. Its repository is MIT-licensed, but its redistributed third-party dependencies have their own licenses and notices, so those remain separately audited.
+
+See [docs/FOUNDATION-AUDIT.md](docs/FOUNDATION-AUDIT.md).
