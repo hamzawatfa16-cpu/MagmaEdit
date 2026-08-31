@@ -1,0 +1,44 @@
+# .NET
+bin/
+obj/
+TestResults/
+*.user
+*.suo
+*.userosscache
+*.sln.iml
+
+# IDE
+.vs/
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local build/runtime state
+artifacts/
+.cache/
+.ffmpeg-cache/
+local/
+
+# Secrets and local credentials
+.env
+.env.*
+!.env.example
+*.secret
+*.pem
+*.pfx
+*.key
+
+# User media/project data must never enter source control
+Content Creation/
+content-creation/
+*.mp4
+*.mov
+*.mkv
+*.avi
+*.webm
+*.mp3
+*.wav
+*.flac
