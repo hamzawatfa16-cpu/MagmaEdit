@@ -82,24 +82,52 @@ public sealed class MainWindow : Window
         Grid.SetRow(media, 1);
         root.Children.Add(media);
 
-        var preview = new Border
+        var previewCanvas = new Border
         {
-            Margin = new Thickness(12, 0),
-            Padding = new Thickness(12),
-            BorderThickness = new Thickness(1),
-            Child = new Grid
+            Width = 360,
+            Height = 640,
+            MaxWidth = 420,
+            MaxHeight = 680,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            Background = Brushes.Black,
+            Child = new StackPanel
             {
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Spacing = 8,
                 Children =
                 {
                     new TextBlock
                     {
                         Text = "Preview",
                         FontSize = 22,
-                        HorizontalAlignment = HorizontalAlignment.Center,
-                        VerticalAlignment = VerticalAlignment.Center
+                        HorizontalAlignment = HorizontalAlignment.Center
+                    },
+                    new TextBlock
+                    {
+                        Text = "9:16 • Fit • No Crop",
+                        Opacity = 0.75,
+                        HorizontalAlignment = HorizontalAlignment.Center
+                    },
+                    new TextBlock
+                    {
+                        Text = "Playback engine integration is kept behind the Preview boundary.",
+                        TextWrapping = TextWrapping.Wrap,
+                        MaxWidth = 260,
+                        TextAlignment = TextAlignment.Center,
+                        HorizontalAlignment = HorizontalAlignment.Center
                     }
                 }
             }
+        };
+
+        var preview = new Border
+        {
+            Margin = new Thickness(12, 0),
+            Padding = new Thickness(12),
+            BorderThickness = new Thickness(1),
+            Child = previewCanvas
         };
         Grid.SetRow(preview, 1);
         Grid.SetColumn(preview, 1);
