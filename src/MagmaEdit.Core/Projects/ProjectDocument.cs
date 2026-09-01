@@ -1,3 +1,4 @@
+using MagmaEdit.Core.Editing;
 using MagmaEdit.Core.Media;
 
 namespace MagmaEdit.Core.Projects;
@@ -5,7 +6,7 @@ namespace MagmaEdit.Core.Projects;
 /// <summary>Versioned, JSON-safe project data. Runtime services and native handles are intentionally excluded.</summary>
 public sealed class ProjectDocument
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
 
     public required string Id { get; init; }
 
@@ -19,6 +20,8 @@ public sealed class ProjectDocument
 
     public List<MediaAsset> Media { get; init; } = [];
 
+    public TimelineDocument Timeline { get; init; } = TimelineDocument.CreateDefault();
+
     public static ProjectDocument Create(string name)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -30,7 +33,8 @@ public sealed class ProjectDocument
             Name = name.Trim(),
             SchemaVersion = CurrentSchemaVersion,
             CreatedUtc = now,
-            ModifiedUtc = now
+            ModifiedUtc = now,
+            Timeline = TimelineDocument.CreateDefault()
         };
     }
 }
