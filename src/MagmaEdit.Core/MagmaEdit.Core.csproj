@@ -6,5 +6,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\third_party\sprocket\src\Sprocket.Core\Sprocket.Core.csproj" />
+    <ProjectReference Include="..\..\third_party\sprocket\src\Sprocket.Media\Sprocket.Media.csproj" />
   </ItemGroup>
 </Project>
