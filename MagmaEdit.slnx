@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/MagmaEdit.Core/MagmaEdit.Core.csproj" />
+    <Project Path="src/MagmaEdit.App/MagmaEdit.App.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/MagmaEdit.Core.Tests/MagmaEdit.Core.Tests.csproj" />
