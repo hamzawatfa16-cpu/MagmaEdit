@@ -13,34 +13,43 @@ namespace MagmaEdit.App;
 /// <summary>Owns the video-library gallery controls, ordering, search, thumbnails, and publish state UI.</summary>
 public sealed class MediaGalleryController : IDisposable
 {
+    private readonly Window _window;
     private readonly StackPanel _host;
+    private readonly StackPanel _parent;
     private readonly Func<IReadOnlyList<MediaAsset>> _getAssets;
     private readonly Action<MediaAsset> _selectMedia;
     private readonly Action _saveProject;
     private readonly Action<string> _setStatus;
     private readonly TextBox _searchBox;
     private readonly ComboBox _sortBox;
-    private readonly StackPanel _grid;
     private readonly Dictionary<string, Bitmap> _thumbnailCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Bitmap _placeholderBitmap;
+    private int _renderedCount = -1;
+    private bool _refreshing;
     private bool _disposed;
 
-    public MediaGalleryController(
+    private MediaGalleryController(
+        Window window,
         StackPanel host,
+        StackPanel parent,
         Func<IReadOnlyList<MediaAsset>> getAssets,
         Action<MediaAsset> selectMedia,
         Action saveProject,
         Action<string> setStatus)
     {
-        _host = host ?? throw new ArgumentNullException(nameof(host));
-        _getAssets = getAssets ?? throw new ArgumentNullException(nameof(getAssets));
-        _selectMedia = selectMedia ?? throw new ArgumentNullException(nameof(selectMedia));
-        _saveProject = saveProject ?? throw new ArgumentNullException(nameof(saveProject));
-        _setStatus = setStatus ?? throw new ArgumentNullException(nameof(setStatus));
+        _window = window;
+        _host = host;
+        _parent = parent;
+        _getAssets = getAssets;
+        _selectMedia = selectMedia;
+        _saveProject = saveProject;
+        _setStatus = setStatus;
 
         _searchBox = new TextBox
         {
             Watermark = "Search videos by name…",
-            HorizontalAlignment = HorizontalAlignment.Stretch
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            MinWidth = 110
         };
         _searchBox.TextChanged += SearchBox_TextChanged;
 
@@ -52,42 +61,100 @@ public sealed class MediaGalleryController : IDisposable
         };
         _sortBox.SelectionChanged += SortBox_SelectionChanged;
 
-        _grid = new StackPanel { Spacing = 8 };
-        _host.Children.Clear();
-        _host.Children.Add(new StackPanel
+        _placeholderBitmap = CreatePlaceholderBitmap();
+
+        int hostIndex = _parent.Children.IndexOf(_host);
+        if (hostIndex < 0)
+        {
+            throw new InvalidOperationException("The media gallery host is not attached to its parent.");
+        }
+
+        var controls = new StackPanel
         {
             Orientation = Orientation.Horizontal,
             Spacing = 8,
             Children = { _searchBox, _sortBox }
-        });
-        _host.Children.Add(_grid);
+        };
+        _parent.Children.Insert(hostIndex, controls);
+
+        _host.LayoutUpdated += Host_LayoutUpdated;
+        Refresh();
+    }
+
+    /// <summary>Attaches the gallery to the existing MainWindow media list.</summary>
+    public static MediaGalleryController Attach(
+        Window window,
+        Func<IReadOnlyList<MediaAsset>> getAssets,
+        Action<MediaAsset> selectMedia,
+        Action saveProject,
+        Action<string> setStatus)
+    {
+        ArgumentNullException.ThrowIfNull(window);
+        ArgumentNullException.ThrowIfNull(getAssets);
+        ArgumentNullException.ThrowIfNull(selectMedia);
+        ArgumentNullException.ThrowIfNull(saveProject);
+        ArgumentNullException.ThrowIfNull(setStatus);
+
+        if (window.Content is not Grid root || root.Children.Count < 2 || root.Children[1] is not Border mediaBorder)
+        {
+            throw new InvalidOperationException("MagmaEdit media panel is not available.");
+        }
+
+        if (mediaBorder.Child is not StackPanel mediaPanel)
+        {
+            throw new InvalidOperationException("MagmaEdit media panel layout is not available.");
+        }
+
+        StackPanel? host = mediaPanel.Children.OfType<StackPanel>().LastOrDefault();
+        if (host is null)
+        {
+            throw new InvalidOperationException("MagmaEdit media list is not available.");
+        }
+
+        return new MediaGalleryController(
+            window,
+            host,
+            mediaPanel,
+            getAssets,
+            selectMedia,
+            saveProject,
+            setStatus);
     }
 
     public void Refresh()
     {
-        if (_disposed)
+        if (_disposed || _refreshing)
         {
             return;
         }
 
-        _grid.Children.Clear();
-        string search = _searchBox.Text?.Trim() ?? string.Empty;
-        bool newestFirst = _sortBox.SelectedIndex != 1;
-
-        IEnumerable<MediaAsset> assets = _getAssets()
-            .Where(asset => search.Length == 0 || asset.FileName.Contains(search, StringComparison.OrdinalIgnoreCase));
-
-        assets = newestFirst
-            ? assets.OrderByDescending(GetSortTimestamp).ThenBy(asset => asset.FileName, StringComparer.OrdinalIgnoreCase)
-            : assets.OrderBy(GetSortTimestamp).ThenBy(asset => asset.FileName, StringComparer.OrdinalIgnoreCase);
-
-        foreach (MediaAsset asset in assets)
+        _refreshing = true;
+        try
         {
-            _grid.Children.Add(CreateCard(asset));
-        }
+            _host.Children.Clear();
+            string search = _searchBox.Text?.Trim() ?? string.Empty;
+            bool newestFirst = _sortBox.SelectedIndex != 1;
 
-        _setStatus($"Showing {_grid.Children.Count} video{(_grid.Children.Count == 1 ? string.Empty : "s")}." +
-                   (search.Length == 0 ? string.Empty : $" Search: {search}"));
+            IEnumerable<MediaAsset> assets = _getAssets()
+                .Where(asset => search.Length == 0 || asset.FileName.Contains(search, StringComparison.OrdinalIgnoreCase));
+
+            assets = newestFirst
+                ? assets.OrderByDescending(GetSortTimestamp).ThenBy(asset => asset.FileName, StringComparer.OrdinalIgnoreCase)
+                : assets.OrderBy(GetSortTimestamp).ThenBy(asset => asset.FileName, StringComparer.OrdinalIgnoreCase);
+
+            foreach (MediaAsset asset in assets)
+            {
+                _host.Children.Add(CreateCard(asset));
+            }
+
+            _renderedCount = _host.Children.Count;
+            _setStatus($"Showing {_renderedCount} video{(_renderedCount == 1 ? string.Empty : "s")}." +
+                       (search.Length == 0 ? string.Empty : $" Search: {search}"));
+        }
+        finally
+        {
+            _refreshing = false;
+        }
     }
 
     private Control CreateCard(MediaAsset asset)
@@ -99,14 +166,10 @@ public sealed class MediaGalleryController : IDisposable
             Stretch = Stretch.Uniform,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
-            Source = CreatePlaceholderBitmap()
+            Source = _thumbnailCache.TryGetValue(asset.LibraryPath, out Bitmap? cached) ? cached : _placeholderBitmap
         };
 
-        if (_thumbnailCache.TryGetValue(asset.LibraryPath, out Bitmap? cached))
-        {
-            thumbnail.Source = cached;
-        }
-        else
+        if (!_thumbnailCache.ContainsKey(asset.LibraryPath))
         {
             _ = LoadThumbnailAsync(asset, thumbnail);
         }
@@ -131,6 +194,7 @@ public sealed class MediaGalleryController : IDisposable
             Padding = new Thickness(6),
             HorizontalContentAlignment = HorizontalAlignment.Center
         };
+        ToolTip.SetTip(selectButton, asset.LibraryPath);
         selectButton.Click += (_, _) => _selectMedia(asset);
 
         var publishButton = new Button
@@ -165,41 +229,52 @@ public sealed class MediaGalleryController : IDisposable
         {
             DecodedPreviewFrame frame = await MediaPreviewService.DecodeFirstFrameAsync(asset.LibraryPath).ConfigureAwait(false);
             WriteableBitmap bitmap = CreateBitmap(frame);
+
             if (_disposed)
             {
                 bitmap.Dispose();
                 return;
             }
 
-            Bitmap? previous = null;
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 if (_disposed)
                 {
-                    bitmap.Dispose();
                     return;
                 }
 
                 if (_thumbnailCache.TryGetValue(asset.LibraryPath, out Bitmap? existing))
                 {
-                    previous = existing;
-                }
-                else
-                {
-                    _thumbnailCache[asset.LibraryPath] = bitmap;
+                    bitmap.Dispose();
+                    target.Source = existing;
+                    return;
                 }
 
-                target.Source = _thumbnailCache[asset.LibraryPath];
+                _thumbnailCache[asset.LibraryPath] = bitmap;
+                target.Source = bitmap;
             });
-
-            if (previous is not null)
-            {
-                bitmap.Dispose();
-            }
         }
-        catch (Exception) when (true)
+        catch (Exception)
         {
-            // Gallery placeholders remain visible when a thumbnail cannot be decoded.
+            // Keep the placeholder when a media item cannot produce a thumbnail.
+        }
+    }
+
+    private void Host_LayoutUpdated(object? sender, EventArgs e)
+    {
+        if (_disposed || _refreshing)
+        {
+            return;
+        }
+
+        IReadOnlyList<MediaAsset> assets = _getAssets();
+        string search = _searchBox.Text?.Trim() ?? string.Empty;
+        int expectedVisibleCount = assets.Count(asset =>
+            search.Length == 0 || asset.FileName.Contains(search, StringComparison.OrdinalIgnoreCase));
+
+        if (_host.Children.Any(child => child is Button) || _host.Children.Count != expectedVisibleCount)
+        {
+            Refresh();
         }
     }
 
@@ -282,13 +357,16 @@ public sealed class MediaGalleryController : IDisposable
         }
 
         _disposed = true;
+        _host.LayoutUpdated -= Host_LayoutUpdated;
         _searchBox.TextChanged -= SearchBox_TextChanged;
         _sortBox.SelectionChanged -= SortBox_SelectionChanged;
+
         foreach (Bitmap bitmap in _thumbnailCache.Values)
         {
             bitmap.Dispose();
         }
 
         _thumbnailCache.Clear();
+        _placeholderBitmap.Dispose();
     }
 }
