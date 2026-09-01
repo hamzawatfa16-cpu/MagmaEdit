@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Sprocket.Core.Model;
 using Sprocket.Core.Timing;
 using Sprocket.Media;
 
