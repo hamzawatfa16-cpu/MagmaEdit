@@ -26,7 +26,7 @@ public static class MediaPreviewService
             throw new FileNotFoundException("The preview video does not exist.", fullPath);
         }
 
-        using VideoDecodeRing ring = new(MediaSource.Open(fullPath));
+        await using VideoDecodeRing ring = new(MediaSource.Open(fullPath));
         ring.Start();
         ring.RequestSeek(Timecode.Zero);
 
