@@ -40,7 +40,7 @@ jobs:
         run: dotnet restore MagmaEdit.slnx
 
       - name: Verify formatting
-        run: dotnet format MagmaEdit.slnx --verify-no-changes --no-restore
+        run: dotnet format MagmaEdit.slnx --verify-no-changes --no-restore --exclude ./third_party/sprocket/
 
       - name: Build
         run: dotnet build MagmaEdit.slnx --configuration Release --no-restore
