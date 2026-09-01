@@ -134,18 +134,31 @@ public sealed class ProjectStore
             throw new InvalidDataException("The project contains invalid timeline settings.");
         }
 
+        HashSet<string> mediaIds = project.Media
+            .Select(media => media.Id)
+            .ToHashSet(StringComparer.Ordinal);
+        HashSet<string> trackIds = new(StringComparer.Ordinal);
+        HashSet<string> clipIds = new(StringComparer.Ordinal);
+
         foreach (TimelineTrack track in project.Timeline.Tracks)
         {
-            if (string.IsNullOrWhiteSpace(track.Id) || string.IsNullOrWhiteSpace(track.Name))
-                throw new InvalidDataException("The project contains an invalid timeline track.");
+            if (string.IsNullOrWhiteSpace(track.Id) || string.IsNullOrWhiteSpace(track.Name) || !trackIds.Add(track.Id))
+                throw new InvalidDataException("The project contains an invalid or duplicate timeline track.");
 
-            foreach (TimelineClip clip in track.Clips)
+            EditTime? previousEnd = null;
+            foreach (TimelineClip clip in track.Clips.OrderBy(item => item.TimelineStart))
             {
-                if (string.IsNullOrWhiteSpace(clip.Id) || string.IsNullOrWhiteSpace(clip.MediaId) ||
+                if (string.IsNullOrWhiteSpace(clip.Id) || !clipIds.Add(clip.Id) ||
+                    string.IsNullOrWhiteSpace(clip.MediaId) || !mediaIds.Contains(clip.MediaId) ||
                     clip.TimelineStart.Ticks < 0 || clip.SourceIn.Ticks < 0 || clip.SourceOut <= clip.SourceIn)
                 {
                     throw new InvalidDataException("The project contains an invalid timeline clip.");
                 }
+
+                if (previousEnd is { } end && clip.TimelineStart < end)
+                    throw new InvalidDataException("The project contains overlapping clips on a timeline track.");
+
+                previousEnd = clip.TimelineEnd;
             }
         }
     }
