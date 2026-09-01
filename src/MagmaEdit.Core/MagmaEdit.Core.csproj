@@ -4,4 +4,7 @@
     <RootNamespace>MagmaEdit.Core</RootNamespace>
     <AssemblyName>MagmaEdit.Core</AssemblyName>
   </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\third_party\sprocket\src\Sprocket.Core\Sprocket.Core.csproj" />
+  </ItemGroup>
 </Project>
