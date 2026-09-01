@@ -177,6 +177,7 @@ public sealed class MediaGalleryController : IDisposable
             HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
             VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            MaxHeight = 560,
             Content = host
         };
 
@@ -352,7 +353,7 @@ public sealed class MediaGalleryController : IDisposable
                 return;
             }
 
-            await Dispatcher.UIThread.InvokeAsync(() =>
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
                 if (_disposed)
                 {
