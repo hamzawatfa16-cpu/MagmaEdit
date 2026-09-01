@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using MagmaEdit.Core.Media;
 using MagmaEdit.Core.Workspace;
 
@@ -65,12 +66,11 @@ public sealed class MediaImportTests
         string root = CreateTemporaryRoot();
         string source = Path.Combine(root, "source.mp4");
         WorkspaceLayout layout = WorkspaceLayout.Create(Path.Combine(root, "Content Creation"));
-        byte[] content = CreateMinimalContainerSignature(".mp4");
+        byte[] content = CreateRealMp4(source);
 
         try
         {
             Directory.CreateDirectory(root);
-            File.WriteAllBytes(source, content);
 
             MediaAsset asset = new MediaImportService(layout).Import(source);
 
@@ -92,12 +92,11 @@ public sealed class MediaImportTests
         string root = CreateTemporaryRoot();
         string source = Path.Combine(root, "clip.mp4");
         WorkspaceLayout layout = WorkspaceLayout.Create(Path.Combine(root, "Content Creation"));
-        byte[] content = CreateMinimalContainerSignature(".mp4");
+        byte[] content = CreateRealMp4(source);
 
         try
         {
             Directory.CreateDirectory(layout.Media);
-            File.WriteAllBytes(source, content);
             File.WriteAllBytes(Path.Combine(layout.Media, "clip.mp4"), [9, 9, 9]);
 
             MediaAsset asset = new MediaImportService(layout).Import(source);
@@ -171,6 +170,57 @@ public sealed class MediaImportTests
         {
             DeleteTemporaryRoot(root);
         }
+    }
+
+    private static byte[] CreateRealMp4(string outputPath)
+    {
+        string? ffmpegDirectory = Environment.GetEnvironmentVariable("SPROCKET_FFMPEG8_DIR");
+        string executable = "ffmpeg";
+        if (!string.IsNullOrWhiteSpace(ffmpegDirectory))
+        {
+            string candidate = Path.Combine(ffmpegDirectory, "ffmpeg.exe");
+            if (File.Exists(candidate))
+            {
+                executable = candidate;
+            }
+        }
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = executable,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardError = true
+        };
+        startInfo.ArgumentList.Add("-hide_banner");
+        startInfo.ArgumentList.Add("-loglevel");
+        startInfo.ArgumentList.Add("error");
+        startInfo.ArgumentList.Add("-y");
+        startInfo.ArgumentList.Add("-f");
+        startInfo.ArgumentList.Add("lavfi");
+        startInfo.ArgumentList.Add("-i");
+        startInfo.ArgumentList.Add("testsrc2=size=64x64:rate=30:duration=1");
+        startInfo.ArgumentList.Add("-an");
+        startInfo.ArgumentList.Add("-c:v");
+        startInfo.ArgumentList.Add("libx264");
+        startInfo.ArgumentList.Add("-pix_fmt");
+        startInfo.ArgumentList.Add("yuv420p");
+        startInfo.ArgumentList.Add("-movflags");
+        startInfo.ArgumentList.Add("+faststart");
+        startInfo.ArgumentList.Add(outputPath);
+
+        using Process process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException("Unable to start FFmpeg to create the test video.");
+
+        string stderr = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"FFmpeg failed to create the test video: {stderr}");
+        }
+
+        return File.ReadAllBytes(outputPath);
     }
 
     private static byte[] CreateMinimalContainerSignature(string extension) =>
