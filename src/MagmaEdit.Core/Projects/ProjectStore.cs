@@ -1,5 +1,6 @@
 using System.Text.Json;
 using MagmaEdit.Core.Editing;
+using MagmaEdit.Core.Media;
 using MagmaEdit.Core.Workspace;
 
 namespace MagmaEdit.Core.Projects;
