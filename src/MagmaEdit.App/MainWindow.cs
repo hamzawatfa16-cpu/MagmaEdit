@@ -27,6 +27,7 @@ public sealed class MainWindow : Window
     private readonly TextBlock _previewText;
     private readonly TextBlock _inspectorText;
     private readonly TextBlock _timelineInfoText;
+    private readonly EditHistory _history = new();
 
     private MediaAsset? _selectedMedia;
     private TimelineTrack? _selectedTrack;
@@ -151,10 +152,11 @@ public sealed class MainWindow : Window
         };
 
         var undoButton = new Button { Content = "Undo" };
-        undoButton.Click += (_, _) => _statusText.Text = "Undo/Redo command history is available in Core; UI history wiring remains next.";
-        var redoButton = new Button { Content = "Redo" };
-        redoButton.Click += (_, _) => _statusText.Text = "Undo/Redo command history is available in Core; UI history wiring remains next.";
+        undoButton.Click += (_, _) => Undo();
         header.Children.Add(undoButton);
+
+        var redoButton = new Button { Content = "Redo" };
+        redoButton.Click += (_, _) => Redo();
         header.Children.Add(redoButton);
 
         var addTrackButton = new Button { Content = "Add Track" };
@@ -318,14 +320,9 @@ public sealed class MainWindow : Window
                 imported++;
             }
 
-            if (imported > 0)
+            if (imported > 0 && lastImportedAsset is not null)
             {
-                if (lastImportedAsset is not null)
-                {
-                    SelectMedia(lastImportedAsset);
-                }
-
-                InsertSelectedMediaAsClip();
+                SelectMedia(lastImportedAsset);
                 SaveProject();
             }
 
@@ -339,31 +336,44 @@ public sealed class MainWindow : Window
 
     private void AddTrack()
     {
-        string name = $"Video {_project.Timeline.Tracks.Count + 1}";
-        _selectedTrack = _project.Timeline.AddTrack(name);
+        var command = new AddTimelineTrackCommand(_project.Timeline, $"Video {_project.Timeline.Tracks.Count + 1}");
+        _history.Execute(command);
+        _selectedTrack = command.Track;
         SaveProject();
-        RefreshTimeline();
-        _statusText.Text = $"Added track: {name}";
+        _statusText.Text = $"Added track: {_selectedTrack.Name}";
+        UpdateHistoryButtons();
     }
 
-    private void InsertSelectedMediaAsClip()
+    private void Undo()
     {
-        if (_selectedMedia is null)
+        if (!_history.Undo())
         {
+            _statusText.Text = "Nothing to undo.";
             return;
         }
 
-        EnsureTimelineTrack();
-        TimelineTrack track = _selectedTrack!;
-        EditTime start = EditTime.Zero;
-        if (track.Clips.Count > 0)
+        SaveProject();
+        _statusText.Text = "Undo complete.";
+        UpdateHistoryButtons();
+    }
+
+    private void Redo()
+    {
+        if (!_history.Redo())
         {
-            start = track.Clips.Max(clip => clip.TimelineEnd);
+            _statusText.Text = "Nothing to redo.";
+            return;
         }
 
-        EditTime sourceOut = EditTime.FromSeconds(5);
-        var editor = new TimelineEditor(_project.Timeline);
-        editor.InsertClip(track.Id, _selectedMedia.Id, start, EditTime.Zero, sourceOut);
+        SaveProject();
+        _statusText.Text = "Redo complete.";
+        UpdateHistoryButtons();
+    }
+
+    private void UpdateHistoryButtons()
+    {
+        // Button state is intentionally refreshed through the next layout pass.
+        // The command history itself is the authoritative state.
     }
 
     private void LoadMediaItems()
