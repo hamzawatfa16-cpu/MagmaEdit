@@ -177,7 +177,7 @@ public sealed class MediaImportTests
         extension.ToLowerInvariant() switch
         {
             ".mp4" or ".m4v" => [0, 0, 0, 16, (byte)'f', (byte)'t', (byte)'y', (byte)'p', (byte)'i', (byte)'s', (byte)'o', (byte)'m', 0, 0, 0, 0],
-            ".mov" => [0, 0, 0, 16, (byte)'f', (byte)'t', (byte)'y', (byte)'p', (byte)'q', (byte)'t',  (byte)' ', (byte)' ', 0, 0, 0, 0],
+            ".mov" => [0, 0, 0, 16, (byte)'f', (byte)'t', (byte)'y', (byte)'p', (byte)'q', (byte)'t', (byte)' ', (byte)' ', 0, 0, 0, 0],
             ".webm" or ".mkv" => [0x1A, 0x45, 0xDF, 0xA3, 0, 0, 0, 0],
             ".avi" => [(byte)'R', (byte)'I', (byte)'F', (byte)'F', 0, 0, 0, 0, (byte)'A', (byte)'V', (byte)'I', (byte)' '],
             _ => throw new ArgumentOutOfRangeException(nameof(extension))
