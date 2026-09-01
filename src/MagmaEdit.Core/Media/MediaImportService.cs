@@ -12,6 +12,9 @@ public sealed record MediaAsset(
     /// <summary>Real media facts captured by Sprocket/FFmpeg when this asset was imported.</summary>
     public MediaProbeResult? Metadata { get; init; }
 
+    /// <summary>Whether the user has marked this video as published.</summary>
+    public bool IsPublished { get; set; }
+
     public static MediaAsset Create(string sourcePath, string libraryPath, MediaProbeResult? metadata = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
