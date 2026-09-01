@@ -54,7 +54,7 @@ public sealed class ProjectStore
         }
     }
 
-    public ProjectDocument Load(string path)
+    public static ProjectDocument Load(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         string fullPath = Path.GetFullPath(path);
