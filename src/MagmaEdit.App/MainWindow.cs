@@ -1,9 +1,12 @@
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using MagmaEdit.Core.Editing;
 using MagmaEdit.Core.Media;
@@ -30,6 +33,8 @@ public sealed class MainWindow : Window
     private readonly EditHistory _history = new();
     private Button? _undoButton;
     private Button? _redoButton;
+    private Bitmap? _previewBitmap;
+    private int _previewGeneration;
 
     private MediaAsset? _selectedMedia;
     private TimelineTrack? _selectedTrack;
@@ -200,8 +205,6 @@ public sealed class MainWindow : Window
         {
             Width = 360,
             Height = 640,
-            MaxWidth = 420,
-            MaxHeight = 680,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
             Background = Brushes.Black,
@@ -339,8 +342,8 @@ public sealed class MainWindow : Window
 
             if (imported > 0 && lastImportedAsset is not null)
             {
-                SelectMedia(lastImportedAsset);
                 SaveProject();
+                SelectMedia(lastImportedAsset);
             }
 
             _statusText.Text = BuildImportStatus(imported, alreadyImported, failed);
@@ -426,7 +429,8 @@ public sealed class MainWindow : Window
     private void SelectMedia(MediaAsset asset)
     {
         _selectedMedia = asset;
-        _previewText.Text = asset.FileName;
+        int generation = ++_previewGeneration;
+        ShowPreviewLoadingState(asset);
 
         if (asset.Metadata is { } metadata)
         {
@@ -448,6 +452,78 @@ public sealed class MainWindow : Window
         }
 
         _statusText.Text = $"Selected: {asset.FileName}";
+        _ = LoadPreviewAsync(asset, generation);
+    }
+
+    private void ShowPreviewLoadingState(MediaAsset asset)
+    {
+        _previewText.IsVisible = true;
+        _previewText.Text = $"Loading preview…\n{asset.FileName}";
+        if (_previewText.Parent is Border previewCanvas)
+        {
+            previewCanvas.Background = Brushes.Black;
+        }
+    }
+
+    private async Task LoadPreviewAsync(MediaAsset asset, int generation)
+    {
+        try
+        {
+            DecodedPreviewFrame frame = await MediaPreviewService.DecodeFirstFrameAsync(asset.LibraryPath);
+            if (generation != _previewGeneration || !ReferenceEquals(asset, _selectedMedia))
+            {
+                return;
+            }
+
+            WriteableBitmap bitmap = CreatePreviewBitmap(frame);
+            Bitmap? previous = _previewBitmap;
+            _previewBitmap = bitmap;
+
+            if (_previewText.Parent is Border previewCanvas)
+            {
+                previewCanvas.Background = new ImageBrush(bitmap)
+                {
+                    Stretch = Stretch.Uniform
+                };
+            }
+
+            _previewText.IsVisible = false;
+            previous?.Dispose();
+        }
+        catch (Exception exception) when (
+            exception is FileNotFoundException or
+            InvalidDataException or
+            IOException or
+            UnauthorizedAccessException)
+        {
+            if (generation != _previewGeneration || !ReferenceEquals(asset, _selectedMedia))
+            {
+                return;
+            }
+
+            _previewText.IsVisible = true;
+            _previewText.Text = $"Preview unavailable\n{exception.Message}";
+            _statusText.Text = $"Preview unavailable: {asset.FileName}";
+        }
+    }
+
+    private static WriteableBitmap CreatePreviewBitmap(DecodedPreviewFrame frame)
+    {
+        GCHandle handle = GCHandle.Alloc(frame.Pixels, GCHandleType.Pinned);
+        try
+        {
+            return new WriteableBitmap(
+                PixelFormats.Rgba8888,
+                AlphaFormat.Opaque,
+                handle.AddrOfPinnedObject(),
+                new PixelSize(frame.Width, frame.Height),
+                new Vector(96, 96),
+                frame.RowBytes);
+        }
+        finally
+        {
+            handle.Free();
+        }
     }
 
     private void RefreshTimeline()
@@ -534,16 +610,16 @@ public sealed class MainWindow : Window
             result += $" Skipped {alreadyImported} already imported video{(alreadyImported == 1 ? string.Empty : "s")}.";
         }
 
-        if (failed > 0)
-        {
-            result += $" Failed {failed} video{(failed == 1 ? string.Empty : "s")}.";
-        }
-
-        return result;
+        return failed == 0
+            ? result
+            : $"{result} Failed {failed} video{(failed == 1 ? string.Empty : "s")}.";
     }
 
     private void MainWindow_Closed(object? sender, EventArgs e)
     {
+        _previewGeneration++;
+        _previewBitmap?.Dispose();
+        _previewBitmap = null;
         SaveProject();
     }
 }
