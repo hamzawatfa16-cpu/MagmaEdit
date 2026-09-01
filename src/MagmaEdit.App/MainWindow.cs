@@ -201,11 +201,12 @@ public sealed class MainWindow : Window
 
     private void AddMediaItem(MediaAsset asset)
     {
-        _mediaList.Children.Add(new TextBlock
+        var item = new TextBlock
         {
             Text = asset.FileName,
-            TextWrapping = TextWrapping.Wrap,
-            ToolTip = asset.LibraryPath
-        });
+            TextWrapping = TextWrapping.Wrap
+        };
+        ToolTip.SetTip(item, asset.LibraryPath);
+        _mediaList.Children.Add(item);
     }
 }
