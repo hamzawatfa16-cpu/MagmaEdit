@@ -66,11 +66,11 @@ public sealed class MediaImportTests
         string root = CreateTemporaryRoot();
         string source = Path.Combine(root, "source.mp4");
         WorkspaceLayout layout = WorkspaceLayout.Create(Path.Combine(root, "Content Creation"));
-        byte[] content = CreateRealMp4(source);
 
         try
         {
             Directory.CreateDirectory(root);
+            byte[] content = CreateRealMp4(source);
 
             MediaAsset asset = new MediaImportService(layout).Import(source);
 
@@ -92,10 +92,11 @@ public sealed class MediaImportTests
         string root = CreateTemporaryRoot();
         string source = Path.Combine(root, "clip.mp4");
         WorkspaceLayout layout = WorkspaceLayout.Create(Path.Combine(root, "Content Creation"));
-        byte[] content = CreateRealMp4(source);
 
         try
         {
+            Directory.CreateDirectory(root);
+            byte[] content = CreateRealMp4(source);
             Directory.CreateDirectory(layout.Media);
             File.WriteAllBytes(Path.Combine(layout.Media, "clip.mp4"), [9, 9, 9]);
 
@@ -174,6 +175,10 @@ public sealed class MediaImportTests
 
     private static byte[] CreateRealMp4(string outputPath)
     {
+        string outputDirectory = Path.GetDirectoryName(outputPath)
+            ?? throw new InvalidOperationException("The test video output path must include a directory.");
+        Directory.CreateDirectory(outputDirectory);
+
         string? ffmpegDirectory = Environment.GetEnvironmentVariable("SPROCKET_FFMPEG8_DIR");
         string executable = "ffmpeg";
         if (!string.IsNullOrWhiteSpace(ffmpegDirectory))
