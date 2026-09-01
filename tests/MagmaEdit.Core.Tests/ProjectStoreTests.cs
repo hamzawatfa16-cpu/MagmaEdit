@@ -1,3 +1,4 @@
+using MagmaEdit.Core.Editing;
 using MagmaEdit.Core.Media;
 using MagmaEdit.Core.Projects;
 using MagmaEdit.Core.Workspace;
@@ -7,7 +8,7 @@ namespace MagmaEdit.Core.Tests;
 public sealed class ProjectStoreTests
 {
     [Fact]
-    public void SaveAndLoadPreservesProjectAndMedia()
+    public void SaveAndLoadPreservesProjectMediaAndTimeline()
     {
         string root = CreateTemporaryRoot();
         WorkspaceLayout layout = WorkspaceLayout.Create(Path.Combine(root, "Content Creation"));
@@ -17,6 +18,9 @@ public sealed class ProjectStoreTests
             Path.Combine(root, "source.mp4"),
             Path.Combine(layout.Media, "source.mp4"));
         project.Media.Add(media);
+        TimelineTrack track = project.Timeline.AddTrack("Video 1");
+        TimelineClip clip = new TimelineEditor(project.Timeline).InsertClip(
+            track.Id, media.Id, EditTime.Zero, EditTime.Zero, EditTime.FromSeconds(5));
         string path = store.GetDefaultPath(project.Name);
 
         try
@@ -31,6 +35,33 @@ public sealed class ProjectStoreTests
             Assert.Single(loaded.Media);
             Assert.Equal(media.Id, loaded.Media[0].Id);
             Assert.Equal(media.LibraryPath, loaded.Media[0].LibraryPath);
+            Assert.Single(loaded.Timeline.Tracks);
+            Assert.Single(loaded.Timeline.Tracks[0].Clips);
+            Assert.Equal(clip.Id, loaded.Timeline.Tracks[0].Clips[0].Id);
+        }
+        finally
+        {
+            DeleteTemporaryRoot(root);
+        }
+    }
+
+    [Fact]
+    public void LoadMigratesSchemaVersionOneToCurrentTimelineSchema()
+    {
+        string root = CreateTemporaryRoot();
+        string path = Path.Combine(root, "legacy.magmaedit.json");
+
+        try
+        {
+            Directory.CreateDirectory(root);
+            File.WriteAllText(path, "{\"id\":\"legacy-id\",\"name\":\"Legacy\",\"schemaVersion\":1,\"createdUtc\":\"2026-01-01T00:00:00+00:00\",\"modifiedUtc\":\"2026-01-01T00:00:00+00:00\",\"media\":[]}");
+
+            ProjectDocument loaded = ProjectStore.Load(path);
+
+            Assert.Equal(ProjectDocument.CurrentSchemaVersion, loaded.SchemaVersion);
+            Assert.Equal(1080, loaded.Timeline.Width);
+            Assert.Equal(1920, loaded.Timeline.Height);
+            Assert.Empty(loaded.Timeline.Tracks);
         }
         finally
         {
@@ -62,14 +93,31 @@ public sealed class ProjectStoreTests
     public void LoadRejectsUnsupportedSchemaVersion()
     {
         string root = CreateTemporaryRoot();
-        WorkspaceLayout layout = WorkspaceLayout.Create(Path.Combine(root, "Content Creation"));
-        _ = layout;
         string path = Path.Combine(root, "project.magmaedit.json");
 
         try
         {
             Directory.CreateDirectory(root);
             File.WriteAllText(path, "{\"id\":\"id\",\"name\":\"name\",\"schemaVersion\":999,\"createdUtc\":\"2026-01-01T00:00:00+00:00\",\"modifiedUtc\":\"2026-01-01T00:00:00+00:00\",\"media\":[]}");
+
+            Assert.Throws<InvalidDataException>(() => ProjectStore.Load(path));
+        }
+        finally
+        {
+            DeleteTemporaryRoot(root);
+        }
+    }
+
+    [Fact]
+    public void LoadRejectsTimelineClipReferencingMissingMedia()
+    {
+        string root = CreateTemporaryRoot();
+        string path = Path.Combine(root, "invalid.magmaedit.json");
+
+        try
+        {
+            Directory.CreateDirectory(root);
+            File.WriteAllText(path, "{\"id\":\"id\",\"name\":\"name\",\"schemaVersion\":2,\"createdUtc\":\"2026-01-01T00:00:00+00:00\",\"modifiedUtc\":\"2026-01-01T00:00:00+00:00\",\"media\":[],\"timeline\":{\"schemaVersion\":1,\"width\":1080,\"height\":1920,\"frameRateNumerator\":30,\"frameRateDenominator\":1,\"tracks\":[{\"id\":\"track\",\"name\":\"Video 1\",\"clips\":[{\"id\":\"clip\",\"mediaId\":\"missing\",\"timelineStart\":{\"ticks\":0},\"sourceIn\":{\"ticks\":0},\"sourceOut\":{\"ticks\":240000}}]}]}}");
 
             Assert.Throws<InvalidDataException>(() => ProjectStore.Load(path));
         }
