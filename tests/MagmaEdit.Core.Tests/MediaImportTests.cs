@@ -70,7 +70,7 @@ public sealed class MediaImportTests
         try
         {
             Directory.CreateDirectory(root);
-            byte[] content = CreateRealMp4(source);
+            byte[] content = CreateRealMp4(source, "testsrc2=size=90x160:rate=30:duration=1");
 
             MediaAsset asset = new MediaImportService(layout).Import(source);
 
@@ -79,6 +79,9 @@ public sealed class MediaImportTests
             Assert.Equal(content, File.ReadAllBytes(asset.LibraryPath));
             Assert.Equal("source.mp4", asset.FileName);
             Assert.Equal(Path.GetFullPath(source), asset.SourcePath);
+            Assert.NotNull(asset.Metadata);
+            Assert.Equal(90, asset.Metadata!.Width);
+            Assert.Equal(160, asset.Metadata.Height);
         }
         finally
         {
@@ -96,7 +99,7 @@ public sealed class MediaImportTests
         try
         {
             Directory.CreateDirectory(root);
-            byte[] content = CreateRealMp4(source);
+            byte[] content = CreateRealMp4(source, "testsrc2=size=90x160:rate=30:duration=1");
             Directory.CreateDirectory(layout.Media);
             File.WriteAllBytes(Path.Combine(layout.Media, "clip.mp4"), [9, 9, 9]);
 
@@ -105,6 +108,30 @@ public sealed class MediaImportTests
             Assert.Equal("clip (2).mp4", asset.FileName);
             Assert.Equal([9, 9, 9], File.ReadAllBytes(Path.Combine(layout.Media, "clip.mp4")));
             Assert.Equal(content, File.ReadAllBytes(asset.LibraryPath));
+        }
+        finally
+        {
+            DeleteTemporaryRoot(root);
+        }
+    }
+
+    [Fact]
+    public void ImportRejectsNonVerticalVideo()
+    {
+        string root = CreateTemporaryRoot();
+        string source = Path.Combine(root, "landscape.mp4");
+        WorkspaceLayout layout = WorkspaceLayout.Create(Path.Combine(root, "Content Creation"));
+
+        try
+        {
+            Directory.CreateDirectory(root);
+            CreateRealMp4(source, "testsrc2=size=160x90:rate=30:duration=1");
+
+            InvalidDataException exception = Assert.Throws<InvalidDataException>(() =>
+                new MediaImportService(layout).Import(source));
+
+            Assert.Contains("must be 9:16", exception.Message, StringComparison.Ordinal);
+            Assert.False(File.Exists(Path.Combine(layout.Media, "landscape.mp4")));
         }
         finally
         {
@@ -173,7 +200,7 @@ public sealed class MediaImportTests
         }
     }
 
-    private static byte[] CreateRealMp4(string outputPath)
+    private static byte[] CreateRealMp4(string outputPath, string filter)
     {
         string outputDirectory = Path.GetDirectoryName(outputPath)
             ?? throw new InvalidOperationException("The test video output path must include a directory.");
@@ -204,7 +231,7 @@ public sealed class MediaImportTests
         startInfo.ArgumentList.Add("-f");
         startInfo.ArgumentList.Add("lavfi");
         startInfo.ArgumentList.Add("-i");
-        startInfo.ArgumentList.Add("testsrc2=size=64x64:rate=30:duration=1");
+        startInfo.ArgumentList.Add(filter);
         startInfo.ArgumentList.Add("-an");
         startInfo.ArgumentList.Add("-c:v");
         startInfo.ArgumentList.Add("libx264");
