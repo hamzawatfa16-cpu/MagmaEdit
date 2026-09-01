@@ -2,7 +2,7 @@
 
 ## Status
 
-Architecture decision draft. No implementation is approved until the upstream foundation audit is complete.
+Foundation implementation stage. The initial MagmaEdit-owned Core, workspace, persistence, timeline, media, preview, desktop shell, tests, and Windows CI gates are implemented. The upstream foundation remains under controlled audit; large upstream source import is not approved until the dependency and licensing boundary is complete.
 
 ## Core principle
 
