@@ -5,13 +5,19 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using MagmaEdit.Core.Media;
+using MagmaEdit.Core.Projects;
 using MagmaEdit.Core.Workspace;
 
 namespace MagmaEdit.App;
 
 public sealed class MainWindow : Window
 {
+    private const string DefaultProjectName = "Untitled Project";
+
     private readonly WorkspaceLayout _workspace;
+    private readonly ProjectStore _projectStore;
+    private readonly ProjectDocument _project;
+    private readonly string _projectPath;
     private readonly StackPanel _mediaList;
     private readonly TextBlock _statusText;
 
@@ -26,10 +32,44 @@ public sealed class MainWindow : Window
 
         _workspace = WorkspaceLayout.ForCurrentUser();
         new WorkspaceManager(_workspace).EnsureCreated();
+        _projectStore = new ProjectStore(_workspace);
+        _projectPath = _projectStore.GetDefaultPath(DefaultProjectName);
+        _project = LoadOrCreateProject();
         _mediaList = new StackPanel { Spacing = 6 };
-        _statusText = new TextBlock { Text = "Ready", Opacity = 0.75, TextWrapping = TextWrapping.Wrap };
+        _statusText = new TextBlock { Text = $"Project: {_project.Name}", Opacity = 0.75, TextWrapping = TextWrapping.Wrap };
 
+        Closed += MainWindow_Closed;
         Content = BuildLayout();
+        LoadMediaItems();
+    }
+
+    private ProjectDocument LoadOrCreateProject()
+    {
+        if (File.Exists(_projectPath))
+        {
+            try
+            {
+                return _projectStore.Load(_projectPath);
+            }
+            catch (InvalidDataException)
+            {
+                string recoveryPath = Path.Combine(_workspace.Projects, $"{DefaultProjectName} - Recovery.magmaedit.json");
+                ProjectDocument recovery = ProjectDocument.Create($"{DefaultProjectName} - Recovery");
+                _projectStore.Save(recovery, recoveryPath);
+                return recovery;
+            }
+            catch (JsonException)
+            {
+                string recoveryPath = Path.Combine(_workspace.Projects, $"{DefaultProjectName} - Recovery.magmaedit.json");
+                ProjectDocument recovery = ProjectDocument.Create($"{DefaultProjectName} - Recovery");
+                _projectStore.Save(recovery, recoveryPath);
+                return recovery;
+            }
+        }
+
+        ProjectDocument project = ProjectDocument.Create(DefaultProjectName);
+        _projectStore.Save(project, _projectPath);
+        return project;
     }
 
     private Grid BuildLayout()
@@ -71,7 +111,7 @@ public sealed class MainWindow : Window
                 Children =
                 {
                     new TextBlock { Text = "Media", FontSize = 18, FontWeight = FontWeight.SemiBold },
-                    new TextBlock { Text = "Videos are copied into Content Creation\\Media. The original file is left untouched." },
+                    new TextBlock { Text = "Imported videos are stored in Content Creation\\Media." },
                     importButton,
                     _statusText,
                     new Separator(),
@@ -91,34 +131,12 @@ public sealed class MainWindow : Window
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
             Background = Brushes.Black,
-            Child = new StackPanel
+            Child = new TextBlock
             {
+                Text = "No video selected",
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
-                Spacing = 8,
-                Children =
-                {
-                    new TextBlock
-                    {
-                        Text = "Preview",
-                        FontSize = 22,
-                        HorizontalAlignment = HorizontalAlignment.Center
-                    },
-                    new TextBlock
-                    {
-                        Text = "9:16 • Fit • No Crop",
-                        Opacity = 0.75,
-                        HorizontalAlignment = HorizontalAlignment.Center
-                    },
-                    new TextBlock
-                    {
-                        Text = "Playback engine integration is kept behind the Preview boundary.",
-                        TextWrapping = TextWrapping.Wrap,
-                        MaxWidth = 260,
-                        TextAlignment = TextAlignment.Center,
-                        HorizontalAlignment = HorizontalAlignment.Center
-                    }
-                }
+                Opacity = 0.75
             }
         };
 
@@ -142,7 +160,7 @@ public sealed class MainWindow : Window
                 Children =
                 {
                     new TextBlock { Text = "Inspector", FontSize = 18, FontWeight = FontWeight.SemiBold },
-                    new TextBlock { Text = "Select a clip to edit its properties." }
+                    new TextBlock { Text = "Select a clip to inspect its properties." }
                 }
             }
         };
@@ -155,15 +173,11 @@ public sealed class MainWindow : Window
             Margin = new Thickness(0, 12, 0, 0),
             Padding = new Thickness(12),
             BorderThickness = new Thickness(1),
-            Child = new StackPanel
+            Child = new TextBlock
             {
-                Spacing = 8,
-                Children =
-                {
-                    new TextBlock { Text = "Timeline", FontSize = 18, FontWeight = FontWeight.SemiBold },
-                    new TextBlock { Text = "Track 1   ─────────────────────────────────────────────", FontFamily = new FontFamily("Consolas") },
-                    new TextBlock { Text = "Track 2   ─────────────────────────────────────────────", FontFamily = new FontFamily("Consolas") }
-                }
+                Text = "Timeline is not connected yet.",
+                VerticalAlignment = VerticalAlignment.Center,
+                Opacity = 0.75
             }
         };
         Grid.SetRow(timeline, 2);
@@ -202,6 +216,7 @@ public sealed class MainWindow : Window
             }
 
             int imported = 0;
+            int alreadyImported = 0;
             var importer = new MediaImportService(_workspace);
 
             foreach (IStorageFile file in files)
@@ -212,18 +227,51 @@ public sealed class MainWindow : Window
                     continue;
                 }
 
-                MediaAsset asset = importer.Import(localPath);
+                string normalizedSource = Path.GetFullPath(localPath);
+                if (_project.Media.Any(asset =>
+                    string.Equals(asset.SourcePath, normalizedSource, StringComparison.OrdinalIgnoreCase)))
+                {
+                    alreadyImported++;
+                    continue;
+                }
+
+                MediaAsset asset = importer.Import(normalizedSource);
+                _project.Media.Add(asset);
                 AddMediaItem(asset);
                 imported++;
             }
 
-            _statusText.Text = imported == 0
-                ? "No local video files were imported."
-                : $"Imported {imported} video{(imported == 1 ? string.Empty : "s")}.";
+            if (imported > 0)
+            {
+                _projectStore.Save(_project, _projectPath);
+            }
+
+            _statusText.Text = BuildImportStatus(imported, alreadyImported);
         }
         catch (Exception exception) when (exception is FileNotFoundException or NotSupportedException or IOException or UnauthorizedAccessException)
         {
             _statusText.Text = exception.Message;
+        }
+    }
+
+    private string BuildImportStatus(int imported, int alreadyImported)
+    {
+        if (imported == 0 && alreadyImported == 0)
+        {
+            return "No local video files were imported.";
+        }
+
+        string result = $"Imported {imported} video{(imported == 1 ? string.Empty : "s")}.";
+        return alreadyImported == 0
+            ? result
+            : $"{result} Skipped {alreadyImported} already imported video{(alreadyImported == 1 ? string.Empty : "s")}.";
+    }
+
+    private void LoadMediaItems()
+    {
+        foreach (MediaAsset asset in _project.Media)
+        {
+            AddMediaItem(asset);
         }
     }
 
@@ -236,5 +284,10 @@ public sealed class MainWindow : Window
         };
         ToolTip.SetTip(item, asset.LibraryPath);
         _mediaList.Children.Add(item);
+    }
+
+    private void MainWindow_Closed(object? sender, EventArgs e)
+    {
+        _projectStore.Save(_project, _projectPath);
     }
 }
