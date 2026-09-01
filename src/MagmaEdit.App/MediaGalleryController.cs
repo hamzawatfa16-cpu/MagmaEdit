@@ -19,7 +19,7 @@ public sealed class MediaGalleryController : IDisposable
     private readonly Func<IReadOnlyList<MediaAsset>> _getAssets;
     private readonly Action<MediaAsset> _selectMedia;
     private readonly Action _saveProject;
-    private readonly Action<MediaAsset> _removeMedia;
+    private readonly Func<MediaAsset, bool> _removeMedia;
     private readonly Action<string> _setStatus;
     private readonly TextBox _searchBox;
     private readonly ComboBox _sortBox;
@@ -35,7 +35,7 @@ public sealed class MediaGalleryController : IDisposable
         Func<IReadOnlyList<MediaAsset>> getAssets,
         Action<MediaAsset> selectMedia,
         Action saveProject,
-        Action<MediaAsset> removeMedia,
+        Func<MediaAsset, bool> removeMedia,
         Action<string> setStatus)
     {
         _window = window;
@@ -80,7 +80,7 @@ public sealed class MediaGalleryController : IDisposable
         Func<IReadOnlyList<MediaAsset>> getAssets,
         Action<MediaAsset> selectMedia,
         Action saveProject,
-        Action<MediaAsset> removeMedia,
+        Func<MediaAsset, bool> removeMedia,
         Action<string> setStatus)
     {
         ArgumentNullException.ThrowIfNull(window);
@@ -128,7 +128,18 @@ public sealed class MediaGalleryController : IDisposable
             () => project.Media,
             asset => selectMethod.Invoke(window, new object[] { asset }),
             saveAndRefresh,
-            asset => project.Media.Remove(asset),
+            asset =>
+            {
+                bool inUse = project.Timeline.Tracks.Any(track =>
+                    track.Clips.Any(clip => string.Equals(clip.MediaId, asset.Id, StringComparison.Ordinal)));
+                if (inUse)
+                {
+                    statusText.Text = $"Cannot remove {asset.FileName}: it is used by the timeline.";
+                    return false;
+                }
+
+                return project.Media.Remove(asset);
+            },
             message => statusText.Text = message);
         return controller;
     }
@@ -138,7 +149,7 @@ public sealed class MediaGalleryController : IDisposable
         Func<IReadOnlyList<MediaAsset>> getAssets,
         Action<MediaAsset> selectMedia,
         Action saveProject,
-        Action<MediaAsset> removeMedia,
+        Func<MediaAsset, bool> removeMedia,
         Action<string> setStatus)
     {
         if (window.Content is not Grid root || root.Children.Count < 2 || root.Children[1] is not Border mediaBorder)
@@ -328,7 +339,11 @@ public sealed class MediaGalleryController : IDisposable
             return;
         }
 
-        _removeMedia(asset);
+        if (!_removeMedia(asset))
+        {
+            return;
+        }
+
         _saveProject();
         if (_thumbnailCache.Remove(asset.LibraryPath, out Bitmap? bitmap))
         {
