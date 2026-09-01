@@ -9,7 +9,10 @@ public sealed record MediaAsset(
     string SourcePath,
     string LibraryPath)
 {
-    public static MediaAsset Create(string sourcePath, string libraryPath)
+    /// <summary>Real media facts captured by Sprocket/FFmpeg when this asset was imported.</summary>
+    public MediaProbeResult? Metadata { get; init; }
+
+    public static MediaAsset Create(string sourcePath, string libraryPath, MediaProbeResult? metadata = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(libraryPath);
@@ -21,11 +24,14 @@ public sealed record MediaAsset(
             Guid.NewGuid().ToString("N"),
             Path.GetFileName(fullLibraryPath),
             fullSourcePath,
-            fullLibraryPath);
+            fullLibraryPath)
+        {
+            Metadata = metadata
+        };
     }
 }
 
-/// <summary>Imports videos by copying them into the MagmaEdit media library without modifying the source.</summary>
+/// <summary>Imports videos by copying them into the MagmaEdit media library and probing the copied media.</summary>
 public sealed class MediaImportService
 {
     private readonly WorkspaceLayout _workspace;
@@ -54,7 +60,40 @@ public sealed class MediaImportService
         string destination = GetUniqueDestination(fullSourcePath);
         File.Copy(fullSourcePath, destination, overwrite: false);
 
-        return MediaAsset.Create(fullSourcePath, destination);
+        try
+        {
+            MediaProbeResult metadata = MediaProbeService.Probe(destination);
+            if (!metadata.HasVideo)
+            {
+                throw new InvalidDataException("The selected file does not contain a usable video stream.");
+            }
+
+            return MediaAsset.Create(fullSourcePath, destination, metadata);
+        }
+        catch
+        {
+            TryDeleteImportedFile(destination);
+            throw;
+        }
+    }
+
+    private static void TryDeleteImportedFile(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch (IOException)
+        {
+            // Preserve the original import/probe failure. Cleanup is best effort.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Preserve the original import/probe failure. Cleanup is best effort.
+        }
     }
 
     private string GetUniqueDestination(string sourcePath)
