@@ -28,6 +28,8 @@ public sealed class MainWindow : Window
     private readonly TextBlock _inspectorText;
     private readonly TextBlock _timelineInfoText;
     private readonly EditHistory _history = new();
+    private Button? _undoButton;
+    private Button? _redoButton;
 
     private MediaAsset? _selectedMedia;
     private TimelineTrack? _selectedTrack;
@@ -80,6 +82,7 @@ public sealed class MainWindow : Window
         Content = BuildLayout();
         LoadMediaItems();
         RefreshTimeline();
+        UpdateHistoryButtons();
     }
 
     private ProjectDocument LoadOrCreateProject()
@@ -151,13 +154,13 @@ public sealed class MainWindow : Window
             }
         };
 
-        var undoButton = new Button { Content = "Undo" };
-        undoButton.Click += (_, _) => Undo();
-        header.Children.Add(undoButton);
+        _undoButton = new Button { Content = "Undo" };
+        _undoButton.Click += (_, _) => Undo();
+        header.Children.Add(_undoButton);
 
-        var redoButton = new Button { Content = "Redo" };
-        redoButton.Click += (_, _) => Redo();
-        header.Children.Add(redoButton);
+        _redoButton = new Button { Content = "Redo" };
+        _redoButton.Click += (_, _) => Redo();
+        header.Children.Add(_redoButton);
 
         var addTrackButton = new Button { Content = "Add Track" };
         addTrackButton.Click += (_, _) => AddTrack();
@@ -349,6 +352,7 @@ public sealed class MainWindow : Window
         if (!_history.Undo())
         {
             _statusText.Text = "Nothing to undo.";
+            UpdateHistoryButtons();
             return;
         }
 
@@ -362,6 +366,7 @@ public sealed class MainWindow : Window
         if (!_history.Redo())
         {
             _statusText.Text = "Nothing to redo.";
+            UpdateHistoryButtons();
             return;
         }
 
@@ -372,8 +377,15 @@ public sealed class MainWindow : Window
 
     private void UpdateHistoryButtons()
     {
-        // Button state is intentionally refreshed through the next layout pass.
-        // The command history itself is the authoritative state.
+        if (_undoButton is not null)
+        {
+            _undoButton.IsEnabled = _history.CanUndo;
+        }
+
+        if (_redoButton is not null)
+        {
+            _redoButton.IsEnabled = _history.CanRedo;
+        }
     }
 
     private void LoadMediaItems()
