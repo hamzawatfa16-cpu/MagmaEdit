@@ -101,19 +101,34 @@ public sealed class TimelineEditor
 
     public TimelineClip InsertClip(string trackId, string mediaId, EditTime timelineStart, EditTime sourceIn, EditTime sourceOut)
     {
-        TimelineTrack track = _timeline.GetTrack(trackId);
         TimelineClip clip = TimelineClip.Create(mediaId, timelineStart, sourceIn, sourceOut);
-        EnsureNoOverlap(track, clip);
-        track.Clips.Add(clip);
-        Sort(track);
+        InsertExistingClip(trackId, clip);
         return clip;
     }
 
-    public void RemoveClip(string trackId, string clipId)
+    public void InsertExistingClip(string trackId, TimelineClip clip, int? index = null)
+    {
+        ArgumentNullException.ThrowIfNull(clip);
+        TimelineTrack track = _timeline.GetTrack(trackId);
+        EnsureNoOverlap(track, clip, clip.Id);
+
+        if (track.Clips.Any(existing => string.Equals(existing.Id, clip.Id, StringComparison.Ordinal)))
+            throw new InvalidOperationException($"Timeline clip '{clip.Id}' already exists.");
+
+        if (index is { } requestedIndex && requestedIndex >= 0 && requestedIndex <= track.Clips.Count)
+            track.Clips.Insert(requestedIndex, clip);
+        else
+            track.Clips.Add(clip);
+
+        Sort(track);
+    }
+
+    public TimelineClip RemoveClip(string trackId, string clipId)
     {
         TimelineTrack track = _timeline.GetTrack(trackId);
         TimelineClip clip = FindClip(track, clipId);
         track.Clips.Remove(clip);
+        return clip;
     }
 
     public void TrimClip(string trackId, string clipId, EditTime sourceIn, EditTime sourceOut)
@@ -147,6 +162,12 @@ public sealed class TimelineEditor
         track.Clips.Insert(index, right);
         track.Clips.Insert(index, left);
         return (left, right);
+    }
+
+    public int GetClipIndex(string trackId, string clipId)
+    {
+        TimelineTrack track = _timeline.GetTrack(trackId);
+        return track.Clips.FindIndex(clip => string.Equals(clip.Id, clipId, StringComparison.Ordinal));
     }
 
     private static TimelineClip FindClip(TimelineTrack track, string clipId) =>
