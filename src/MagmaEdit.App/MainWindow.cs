@@ -5,6 +5,7 @@ using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
+using MagmaEdit.Core.Editing;
 using MagmaEdit.Core.Media;
 using MagmaEdit.Core.Projects;
 using MagmaEdit.Core.Workspace;
@@ -14,17 +15,21 @@ namespace MagmaEdit.App;
 public sealed class MainWindow : Window
 {
     private const string DefaultProjectName = "Untitled Project";
+    private const string DefaultTrackName = "Video 1";
 
     private readonly WorkspaceLayout _workspace;
     private readonly ProjectStore _projectStore;
     private readonly ProjectDocument _project;
     private readonly string _projectPath;
     private readonly StackPanel _mediaList;
+    private readonly StackPanel _timelineList;
     private readonly TextBlock _statusText;
     private readonly TextBlock _previewText;
     private readonly TextBlock _inspectorText;
+    private readonly TextBlock _timelineInfoText;
 
     private MediaAsset? _selectedMedia;
+    private TimelineTrack? _selectedTrack;
 
     public MainWindow()
     {
@@ -40,7 +45,9 @@ public sealed class MainWindow : Window
         _projectStore = new ProjectStore(_workspace);
         _projectPath = _projectStore.GetDefaultPath(DefaultProjectName);
         _project = LoadOrCreateProject();
+
         _mediaList = new StackPanel { Spacing = 6 };
+        _timelineList = new StackPanel { Spacing = 8 };
         _statusText = new TextBlock
         {
             Text = $"Project: {_project.Name}",
@@ -61,10 +68,17 @@ public sealed class MainWindow : Window
             Text = "Select a media item to inspect it.",
             TextWrapping = TextWrapping.Wrap
         };
+        _timelineInfoText = new TextBlock
+        {
+            Text = "0 tracks",
+            Opacity = 0.7
+        };
 
+        EnsureTimelineTrack();
         Closed += MainWindow_Closed;
         Content = BuildLayout();
         LoadMediaItems();
+        RefreshTimeline();
     }
 
     private ProjectDocument LoadOrCreateProject()
@@ -98,26 +112,55 @@ public sealed class MainWindow : Window
         return recovery;
     }
 
+    private void EnsureTimelineTrack()
+    {
+        if (_project.Timeline.Tracks.Count == 0)
+        {
+            _selectedTrack = _project.Timeline.AddTrack(DefaultTrackName);
+            SaveProject();
+        }
+        else
+        {
+            _selectedTrack = _project.Timeline.Tracks[0];
+        }
+    }
+
     private Grid BuildLayout()
     {
         var root = new Grid
         {
-            RowDefinitions = new RowDefinitions("Auto,*,180"),
+            RowDefinitions = new RowDefinitions("Auto,*,220"),
             ColumnDefinitions = new ColumnDefinitions("260,*,280"),
             Margin = new Thickness(12)
         };
 
-        var header = new Border
+        var header = new StackPanel
         {
-            Padding = new Thickness(16, 12),
-            Background = Brushes.Transparent,
-            Child = new TextBlock
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            Children =
             {
-                Text = "MagmaEdit",
-                FontSize = 24,
-                FontWeight = FontWeight.SemiBold
+                new TextBlock
+                {
+                    Text = "MagmaEdit",
+                    FontSize = 24,
+                    FontWeight = FontWeight.SemiBold,
+                    VerticalAlignment = VerticalAlignment.Center
+                }
             }
         };
+
+        var undoButton = new Button { Content = "Undo" };
+        undoButton.Click += (_, _) => _statusText.Text = "Undo/Redo command history is available in Core; UI history wiring remains next.";
+        var redoButton = new Button { Content = "Redo" };
+        redoButton.Click += (_, _) => _statusText.Text = "Undo/Redo command history is available in Core; UI history wiring remains next.";
+        header.Children.Add(undoButton);
+        header.Children.Add(redoButton);
+
+        var addTrackButton = new Button { Content = "Add Track" };
+        addTrackButton.Click += (_, _) => AddTrack();
+        header.Children.Add(addTrackButton);
+
         Grid.SetColumnSpan(header, 3);
         root.Children.Add(header);
 
@@ -137,7 +180,7 @@ public sealed class MainWindow : Window
                 Children =
                 {
                     new TextBlock { Text = "Media", FontSize = 18, FontWeight = FontWeight.SemiBold },
-                    new TextBlock { Text = "Imported videos are stored in Content Creation\\Media." },
+                    new TextBlock { Text = "Imported videos are stored in Content Creation\\Media.", TextWrapping = TextWrapping.Wrap },
                     importButton,
                     _statusText,
                     new Separator(),
@@ -193,11 +236,23 @@ public sealed class MainWindow : Window
             Margin = new Thickness(0, 12, 0, 0),
             Padding = new Thickness(12),
             BorderThickness = new Thickness(1),
-            Child = new TextBlock
+            Child = new StackPanel
             {
-                Text = "Timeline is not connected yet.",
-                VerticalAlignment = VerticalAlignment.Center,
-                Opacity = 0.75
+                Spacing = 8,
+                Children =
+                {
+                    new StackPanel
+                    {
+                        Orientation = Orientation.Horizontal,
+                        Spacing = 12,
+                        Children =
+                        {
+                            new TextBlock { Text = "Timeline", FontSize = 18, FontWeight = FontWeight.SemiBold },
+                            _timelineInfoText
+                        }
+                    },
+                    _timelineList
+                }
             }
         };
         Grid.SetRow(timeline, 2);
@@ -270,7 +325,8 @@ public sealed class MainWindow : Window
                     SelectMedia(lastImportedAsset);
                 }
 
-                _projectStore.Save(_project, _projectPath);
+                InsertSelectedMediaAsClip();
+                SaveProject();
             }
 
             _statusText.Text = BuildImportStatus(imported, alreadyImported);
@@ -281,17 +337,33 @@ public sealed class MainWindow : Window
         }
     }
 
-    private static string BuildImportStatus(int imported, int alreadyImported)
+    private void AddTrack()
     {
-        if (imported == 0 && alreadyImported == 0)
+        string name = $"Video {_project.Timeline.Tracks.Count + 1}";
+        _selectedTrack = _project.Timeline.AddTrack(name);
+        SaveProject();
+        RefreshTimeline();
+        _statusText.Text = $"Added track: {name}";
+    }
+
+    private void InsertSelectedMediaAsClip()
+    {
+        if (_selectedMedia is null)
         {
-            return "No local video files were imported.";
+            return;
         }
 
-        string result = $"Imported {imported} video{(imported == 1 ? string.Empty : "s")}.";
-        return alreadyImported == 0
-            ? result
-            : $"{result} Skipped {alreadyImported} already imported video{(alreadyImported == 1 ? string.Empty : "s")}.";
+        EnsureTimelineTrack();
+        TimelineTrack track = _selectedTrack!;
+        EditTime start = EditTime.Zero;
+        if (track.Clips.Count > 0)
+        {
+            start = track.Clips.Max(clip => clip.TimelineEnd);
+        }
+
+        EditTime sourceOut = EditTime.FromSeconds(5);
+        var editor = new TimelineEditor(_project.Timeline);
+        editor.InsertClip(track.Id, _selectedMedia.Id, start, EditTime.Zero, sourceOut);
     }
 
     private void LoadMediaItems()
@@ -326,8 +398,92 @@ public sealed class MainWindow : Window
         _statusText.Text = $"Selected: {asset.FileName}";
     }
 
+    private void RefreshTimeline()
+    {
+        _timelineList.Children.Clear();
+        foreach (TimelineTrack track in _project.Timeline.Tracks)
+        {
+            var trackPanel = new StackPanel { Spacing = 4 };
+            var trackHeader = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 8
+            };
+            var selectTrack = new Button { Content = track.Name };
+            selectTrack.Click += (_, _) =>
+            {
+                _selectedTrack = track;
+                _statusText.Text = $"Selected track: {track.Name}";
+                RefreshTimeline();
+            };
+            trackHeader.Children.Add(selectTrack);
+            trackHeader.Children.Add(new TextBlock
+            {
+                Text = track.Clips.Count == 0 ? "Empty" : $"{track.Clips.Count} clip(s)",
+                VerticalAlignment = VerticalAlignment.Center,
+                Opacity = 0.7
+            });
+            trackPanel.Children.Add(trackHeader);
+
+            foreach (TimelineClip clip in track.Clips)
+            {
+                MediaAsset? media = _project.Media.FirstOrDefault(asset =>
+                    string.Equals(asset.Id, clip.MediaId, StringComparison.Ordinal));
+                string mediaName = media?.FileName ?? $"Missing media {clip.MediaId}";
+                string label = $"{mediaName}  |  {clip.TimelineStart.ToSeconds():0.##}s - {clip.TimelineEnd.ToSeconds():0.##}s";
+                var clipButton = new Button
+                {
+                    Content = label,
+                    HorizontalContentAlignment = HorizontalAlignment.Left,
+                    HorizontalAlignment = HorizontalAlignment.Stretch
+                };
+                clipButton.Click += (_, _) =>
+                {
+                    _statusText.Text = $"Selected clip: {mediaName}";
+                    _inspectorText.Text =
+                        $"Clip ID: {clip.Id}\n\n" +
+                        $"Track: {track.Name}\n\n" +
+                        $"Start: {clip.TimelineStart.ToSeconds():0.###} s\n" +
+                        $"Duration: {clip.Duration.ToSeconds():0.###} s\n" +
+                        $"Source In: {clip.SourceIn.ToSeconds():0.###} s\n" +
+                        $"Source Out: {clip.SourceOut.ToSeconds():0.###} s";
+                };
+                trackPanel.Children.Add(clipButton);
+            }
+
+            _timelineList.Children.Add(new Border
+            {
+                Padding = new Thickness(8),
+                BorderThickness = new Thickness(1),
+                Child = trackPanel
+            });
+        }
+
+        _timelineInfoText.Text = $"{_project.Timeline.Tracks.Count} track(s) • { _project.Timeline.Tracks.Sum(track => track.Clips.Count) } clip(s) • {_project.Timeline.Width}×{_project.Timeline.Height} @ {_project.Timeline.FrameRateNumerator}/{_project.Timeline.FrameRateDenominator}";
+    }
+
+    private void SaveProject()
+    {
+        _project.ModifiedUtc = DateTimeOffset.UtcNow;
+        _projectStore.Save(_project, _projectPath);
+        RefreshTimeline();
+    }
+
+    private static string BuildImportStatus(int imported, int alreadyImported)
+    {
+        if (imported == 0 && alreadyImported == 0)
+        {
+            return "No local video files were imported.";
+        }
+
+        string result = $"Imported {imported} video{(imported == 1 ? string.Empty : "s")}.";
+        return alreadyImported == 0
+            ? result
+            : $"{result} Skipped {alreadyImported} already imported video{(alreadyImported == 1 ? string.Empty : "s")}.";
+    }
+
     private void MainWindow_Closed(object? sender, EventArgs e)
     {
-        _projectStore.Save(_project, _projectPath);
+        SaveProject();
     }
 }
