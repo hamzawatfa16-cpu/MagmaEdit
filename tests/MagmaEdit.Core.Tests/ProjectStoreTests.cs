@@ -23,7 +23,7 @@ public sealed class ProjectStoreTests
         {
             Directory.CreateDirectory(root);
             store.Save(project);
-            ProjectDocument loaded = store.Load(path);
+            ProjectDocument loaded = ProjectStore.Load(path);
 
             Assert.Equal(project.Id, loaded.Id);
             Assert.Equal(project.Name, loaded.Name);
@@ -63,7 +63,7 @@ public sealed class ProjectStoreTests
     {
         string root = CreateTemporaryRoot();
         WorkspaceLayout layout = WorkspaceLayout.Create(Path.Combine(root, "Content Creation"));
-        ProjectStore store = new(layout);
+        _ = layout;
         string path = Path.Combine(root, "project.magmaedit.json");
 
         try
@@ -71,7 +71,7 @@ public sealed class ProjectStoreTests
             Directory.CreateDirectory(root);
             File.WriteAllText(path, "{\"id\":\"id\",\"name\":\"name\",\"schemaVersion\":999,\"createdUtc\":\"2026-01-01T00:00:00+00:00\",\"modifiedUtc\":\"2026-01-01T00:00:00+00:00\",\"media\":[]}");
 
-            Assert.Throws<InvalidDataException>(() => store.Load(path));
+            Assert.Throws<InvalidDataException>(() => ProjectStore.Load(path));
         }
         finally
         {
@@ -97,7 +97,7 @@ public sealed class ProjectStoreTests
             second.Media.Add(MediaAsset.Create("C:\\source.mp4", "C:\\library.mp4"));
             store.Save(second, path);
 
-            ProjectDocument loaded = store.Load(path);
+            ProjectDocument loaded = ProjectStore.Load(path);
             Assert.Equal(second.Id, loaded.Id);
             Assert.Single(loaded.Media);
             Assert.Empty(Directory.GetFiles(layout.Projects, "*.tmp"));
