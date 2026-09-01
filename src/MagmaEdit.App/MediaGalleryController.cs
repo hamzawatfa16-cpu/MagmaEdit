@@ -75,7 +75,6 @@ public sealed class MediaGalleryController : IDisposable
         Refresh();
     }
 
-    /// <summary>Attaches the gallery using explicit model and UI delegates.</summary>
     public static MediaGalleryController Attach(
         Window window,
         Func<IReadOnlyList<MediaAsset>> getAssets,
@@ -93,10 +92,6 @@ public sealed class MediaGalleryController : IDisposable
         return CreateForWindow(window, getAssets, selectMedia, saveProject, removeMedia, setStatus);
     }
 
-    /// <summary>
-    /// Attaches the gallery to MainWindow at the UI integration boundary. Reflection stays isolated here so
-    /// the media gallery does not depend on MainWindow's private implementation details elsewhere.
-    /// </summary>
     public static MediaGalleryController Attach(Window window)
     {
         ArgumentNullException.ThrowIfNull(window);
@@ -335,7 +330,11 @@ public sealed class MediaGalleryController : IDisposable
 
         _removeMedia(asset);
         _saveProject();
-        _thumbnailCache.Remove(asset.LibraryPath)?.Dispose();
+        if (_thumbnailCache.Remove(asset.LibraryPath, out Bitmap? bitmap))
+        {
+            bitmap.Dispose();
+        }
+
         Refresh();
         _setStatus($"Removed {asset.FileName} from the gallery. The Content Creation copy was kept.");
     }
