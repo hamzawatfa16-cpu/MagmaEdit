@@ -1,0 +1,1 @@
+Sprocket integration is pinned to commit 8c35b7604d5e859931dd83146b3a430591860d94. The source must remain a real Git submodule at third_party/sprocket. No placeholder source is used.
