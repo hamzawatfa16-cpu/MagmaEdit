@@ -76,7 +76,9 @@ jobs:
             throw 'FFmpeg 8 archive was downloaded, but avcodec-62.dll was not found.'
           }
 
-          $required = @('avutil-60.dll', 'swresample-6.dll', 'swscale-9.dll', 'postproc-59.dll', 'avcodec-62.dll', 'avformat-62.dll', 'avfilter-11.dll', 'avdevice-62.dll')
+          # These are the FFmpeg 8 DLLs used by the Sprocket media stack on Windows.
+          # postproc is not shipped in the selected BtbN shared archive and is optional in FFmpegLoader.
+          $required = @('avutil-60.dll', 'swresample-6.dll', 'swscale-9.dll', 'avcodec-62.dll', 'avformat-62.dll', 'avfilter-11.dll', 'avdevice-62.dll')
           foreach ($name in $required) {
             if (-not (Test-Path (Join-Path $ffmpegBin $name))) {
               throw "Required FFmpeg 8 native library is missing: $name"
