@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/MagmaEdit.Core/MagmaEdit.Core.csproj" />
     <Project Path="src/MagmaEdit.App/MagmaEdit.App.csproj" />
+    <Project Path="third_party/sprocket/src/Sprocket.Core/Sprocket.Core.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/MagmaEdit.Core.Tests/MagmaEdit.Core.Tests.csproj" />
