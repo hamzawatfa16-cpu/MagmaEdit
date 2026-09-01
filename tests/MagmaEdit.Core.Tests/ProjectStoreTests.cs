@@ -46,6 +46,34 @@ public sealed class ProjectStoreTests
     }
 
     [Fact]
+    public void SaveAndLoadPreservesPublishedState()
+    {
+        string root = CreateTemporaryRoot();
+        WorkspaceLayout layout = WorkspaceLayout.Create(Path.Combine(root, "Content Creation"));
+        ProjectStore store = new(layout);
+        ProjectDocument project = ProjectDocument.Create("Published State");
+        MediaAsset media = MediaAsset.Create(
+            Path.Combine(root, "published.mp4"),
+            Path.Combine(layout.Media, "published.mp4"));
+        media.IsPublished = true;
+        project.Media.Add(media);
+        string path = store.GetDefaultPath(project.Name);
+
+        try
+        {
+            Directory.CreateDirectory(root);
+            store.Save(project);
+            ProjectDocument loaded = ProjectStore.Load(path);
+
+            Assert.True(loaded.Media.Single().IsPublished);
+        }
+        finally
+        {
+            DeleteTemporaryRoot(root);
+        }
+    }
+
+    [Fact]
     public void LoadMigratesSchemaVersionOneToCurrentTimelineSchema()
     {
         string root = CreateTemporaryRoot();
@@ -149,6 +177,25 @@ public sealed class ProjectStoreTests
             Assert.Equal(second.Id, loaded.Id);
             Assert.Single(loaded.Media);
             Assert.Empty(Directory.GetFiles(layout.Projects, "*.tmp"));
+        }
+        finally
+        {
+            DeleteTemporaryRoot(root);
+        }
+    }
+
+    [Fact]
+    public void LoadRejectsDuplicateMediaIds()
+    {
+        string root = CreateTemporaryRoot();
+        string path = Path.Combine(root, "duplicate-media.magmaedit.json");
+
+        try
+        {
+            Directory.CreateDirectory(root);
+            File.WriteAllText(path, "{\"id\":\"id\",\"name\":\"name\",\"schemaVersion\":2,\"createdUtc\":\"2026-01-01T00:00:00+00:00\",\"modifiedUtc\":\"2026-01-01T00:00:00+00:00\",\"media\":[{\"id\":\"media\",\"fileName\":\"a.mp4\",\"sourcePath\":\"C:\\\\a.mp4\",\"libraryPath\":\"C:\\\\a.mp4\"},{\"id\":\"media\",\"fileName\":\"b.mp4\",\"sourcePath\":\"C:\\\\b.mp4\",\"libraryPath\":\"C:\\\\b.mp4\"}],\"timeline\":{\"schemaVersion\":1,\"width\":1080,\"height\":1920,\"frameRateNumerator\":30,\"frameRateDenominator\":1,\"tracks\":[]}}");
+
+            Assert.Throws<InvalidDataException>(() => ProjectStore.Load(path));
         }
         finally
         {
