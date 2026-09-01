@@ -509,3 +509,4 @@ public sealed class MainWindow : Window
         SaveProject();
     }
 }
+
