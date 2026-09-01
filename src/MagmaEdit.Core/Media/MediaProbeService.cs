@@ -27,9 +27,9 @@ public sealed record MediaProbeResult(
     string ChromaSubsampling);
 
 /// <summary>Opens the real Sprocket Media layer to probe an imported source. No mock metadata is generated.</summary>
-public sealed class MediaProbeService
+public static class MediaProbeService
 {
-    public MediaProbeResult Probe(string path)
+    public static MediaProbeResult Probe(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
