@@ -16,7 +16,9 @@ public sealed class App : Application
     {
         if (ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
         {
-            desktop.MainWindow = new MainWindow();
+            var window = new MainWindow();
+            _ = PreviewPlaybackController.Attach(window);
+            desktop.MainWindow = window;
         }
 
         base.OnFrameworkInitializationCompleted();
