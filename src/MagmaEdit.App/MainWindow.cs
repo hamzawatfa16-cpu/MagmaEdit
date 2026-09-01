@@ -297,6 +297,7 @@ public sealed class MainWindow : Window
 
             int imported = 0;
             int alreadyImported = 0;
+            int failed = 0;
             MediaAsset? lastImportedAsset = null;
             var importer = new MediaImportService(_workspace);
 
@@ -305,6 +306,7 @@ public sealed class MainWindow : Window
                 string? localPath = file.TryGetLocalPath();
                 if (string.IsNullOrWhiteSpace(localPath))
                 {
+                    failed++;
                     continue;
                 }
 
@@ -316,11 +318,23 @@ public sealed class MainWindow : Window
                     continue;
                 }
 
-                MediaAsset asset = importer.Import(normalizedSource);
-                _project.Media.Add(asset);
-                AddMediaItem(asset);
-                lastImportedAsset = asset;
-                imported++;
+                try
+                {
+                    MediaAsset asset = importer.Import(normalizedSource);
+                    _project.Media.Add(asset);
+                    AddMediaItem(asset);
+                    lastImportedAsset = asset;
+                    imported++;
+                }
+                catch (Exception exception) when (
+                    exception is FileNotFoundException or
+                    NotSupportedException or
+                    InvalidDataException or
+                    IOException or
+                    UnauthorizedAccessException)
+                {
+                    failed++;
+                }
             }
 
             if (imported > 0 && lastImportedAsset is not null)
@@ -329,9 +343,9 @@ public sealed class MainWindow : Window
                 SaveProject();
             }
 
-            _statusText.Text = BuildImportStatus(imported, alreadyImported);
+            _statusText.Text = BuildImportStatus(imported, alreadyImported, failed);
         }
-        catch (Exception exception) when (exception is FileNotFoundException or NotSupportedException or IOException or UnauthorizedAccessException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             _statusText.Text = exception.Message;
         }
@@ -413,10 +427,26 @@ public sealed class MainWindow : Window
     {
         _selectedMedia = asset;
         _previewText.Text = asset.FileName;
-        _inspectorText.Text =
-            $"Name: {asset.FileName}\n\n" +
-            $"Source: {asset.SourcePath}\n\n" +
-            $"Library: {asset.LibraryPath}";
+
+        if (asset.Metadata is { } metadata)
+        {
+            _inspectorText.Text =
+                $"Name: {asset.FileName}\n\n" +
+                $"Size: {metadata.Width}×{metadata.Height}\n\n" +
+                $"Duration: {metadata.Duration.TotalSeconds:0.###} s\n\n" +
+                $"FPS: {metadata.FramesPerSecond:0.###}\n\n" +
+                $"Video codec: {metadata.VideoCodec}\n\n" +
+                $"Audio: {(metadata.HasAudio ? metadata.AudioCodec : "None")}\n\n" +
+                $"Library: {asset.LibraryPath}";
+        }
+        else
+        {
+            _inspectorText.Text =
+                $"Name: {asset.FileName}\n\n" +
+                $"Source: {asset.SourcePath}\n\n" +
+                $"Library: {asset.LibraryPath}";
+        }
+
         _statusText.Text = $"Selected: {asset.FileName}";
     }
 
@@ -491,17 +521,25 @@ public sealed class MainWindow : Window
         RefreshTimeline();
     }
 
-    private static string BuildImportStatus(int imported, int alreadyImported)
+    private static string BuildImportStatus(int imported, int alreadyImported, int failed)
     {
-        if (imported == 0 && alreadyImported == 0)
+        if (imported == 0 && alreadyImported == 0 && failed == 0)
         {
             return "No local video files were imported.";
         }
 
         string result = $"Imported {imported} video{(imported == 1 ? string.Empty : "s")}.";
-        return alreadyImported == 0
-            ? result
-            : $"{result} Skipped {alreadyImported} already imported video{(alreadyImported == 1 ? string.Empty : "s")}.";
+        if (alreadyImported > 0)
+        {
+            result += $" Skipped {alreadyImported} already imported video{(alreadyImported == 1 ? string.Empty : "s")}.";
+        }
+
+        if (failed > 0)
+        {
+            result += $" Failed {failed} video{(failed == 1 ? string.Empty : "s")}.";
+        }
+
+        return result;
     }
 
     private void MainWindow_Closed(object? sender, EventArgs e)
@@ -509,4 +547,3 @@ public sealed class MainWindow : Window
         SaveProject();
     }
 }
-
