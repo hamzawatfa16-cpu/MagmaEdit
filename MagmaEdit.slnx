@@ -4,6 +4,8 @@
     <Project Path="src/MagmaEdit.App/MagmaEdit.App.csproj" />
     <Project Path="third_party/sprocket/src/Sprocket.Core/Sprocket.Core.csproj" />
     <Project Path="third_party/sprocket/src/Sprocket.Media/Sprocket.Media.csproj" />
+    <Project Path="third_party/sprocket/src/Sprocket.Render/Sprocket.Render.csproj" />
+    <Project Path="third_party/sprocket/src/Sprocket.Playback/Sprocket.Playback.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/MagmaEdit.Core.Tests/MagmaEdit.Core.Tests.csproj" />
