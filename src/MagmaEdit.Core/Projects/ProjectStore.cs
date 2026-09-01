@@ -134,9 +134,19 @@ public sealed class ProjectStore
             throw new InvalidDataException("The project contains invalid timeline settings.");
         }
 
-        HashSet<string> mediaIds = project.Media
-            .Select(media => media.Id)
-            .ToHashSet(StringComparer.Ordinal);
+        HashSet<string> mediaIds = new(StringComparer.Ordinal);
+        foreach (MediaAsset media in project.Media)
+        {
+            if (string.IsNullOrWhiteSpace(media.Id) ||
+                string.IsNullOrWhiteSpace(media.FileName) ||
+                string.IsNullOrWhiteSpace(media.SourcePath) ||
+                string.IsNullOrWhiteSpace(media.LibraryPath) ||
+                !mediaIds.Add(media.Id))
+            {
+                throw new InvalidDataException("The project contains an invalid or duplicate media asset.");
+            }
+        }
+
         HashSet<string> trackIds = new(StringComparer.Ordinal);
         HashSet<string> clipIds = new(StringComparer.Ordinal);
 
