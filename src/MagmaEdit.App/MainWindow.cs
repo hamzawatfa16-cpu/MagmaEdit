@@ -237,6 +237,7 @@ public sealed class MainWindow : Window
 
             int imported = 0;
             int alreadyImported = 0;
+            MediaAsset? lastImportedAsset = null;
             var importer = new MediaImportService(_workspace);
 
             foreach (IStorageFile file in files)
@@ -258,12 +259,17 @@ public sealed class MainWindow : Window
                 MediaAsset asset = importer.Import(normalizedSource);
                 _project.Media.Add(asset);
                 AddMediaItem(asset);
+                lastImportedAsset = asset;
                 imported++;
             }
 
             if (imported > 0)
             {
-                SelectMedia(_project.Media[^imported]);
+                if (lastImportedAsset is not null)
+                {
+                    SelectMedia(lastImportedAsset);
+                }
+
                 _projectStore.Save(_project, _projectPath);
             }
 
@@ -302,9 +308,9 @@ public sealed class MainWindow : Window
         {
             Content = asset.FileName,
             HorizontalContentAlignment = HorizontalAlignment.Left,
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            ToolTip = asset.LibraryPath
+            HorizontalAlignment = HorizontalAlignment.Stretch
         };
+        ToolTip.SetTip(item, asset.LibraryPath);
         item.Click += (_, _) => SelectMedia(asset);
         _mediaList.Children.Add(item);
     }
