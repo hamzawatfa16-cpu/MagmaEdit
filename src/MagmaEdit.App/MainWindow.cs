@@ -50,7 +50,7 @@ public sealed class MainWindow : Window
         {
             try
             {
-                return _projectStore.Load(_projectPath);
+                return ProjectStore.Load(_projectPath);
             }
             catch (InvalidDataException)
             {
@@ -257,7 +257,7 @@ public sealed class MainWindow : Window
         }
     }
 
-    private string BuildImportStatus(int imported, int alreadyImported)
+    private static string BuildImportStatus(int imported, int alreadyImported)
     {
         if (imported == 0 && alreadyImported == 0)
         {
