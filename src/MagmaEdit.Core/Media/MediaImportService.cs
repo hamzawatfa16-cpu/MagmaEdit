@@ -68,6 +68,12 @@ public sealed class MediaImportService
                 throw new InvalidDataException("The selected file does not contain a usable video stream.");
             }
 
+            if (!IsVerticalShort(metadata.Width, metadata.Height))
+            {
+                throw new InvalidDataException(
+                    $"The selected video must be 9:16. Detected {metadata.Width}×{metadata.Height}.");
+            }
+
             return MediaAsset.Create(fullSourcePath, destination, metadata);
         }
         catch
@@ -76,6 +82,9 @@ public sealed class MediaImportService
             throw;
         }
     }
+
+    private static bool IsVerticalShort(int width, int height) =>
+        width > 0 && height > 0 && (long)width * 16L == (long)height * 9L;
 
     private static void TryDeleteImportedFile(string path)
     {
