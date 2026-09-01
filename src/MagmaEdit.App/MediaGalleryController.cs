@@ -6,7 +6,6 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
-using Avalonia.Threading;
 using MagmaEdit.Core.Media;
 using MagmaEdit.Core.Projects;
 
@@ -17,35 +16,34 @@ public sealed class MediaGalleryController : IDisposable
 {
     private readonly Window _window;
     private readonly WrapPanel _host;
-    private readonly StackPanel _parent;
     private readonly Func<IReadOnlyList<MediaAsset>> _getAssets;
     private readonly Action<MediaAsset> _selectMedia;
     private readonly Action _saveProject;
+    private readonly Action<MediaAsset> _removeMedia;
     private readonly Action<string> _setStatus;
     private readonly TextBox _searchBox;
     private readonly ComboBox _sortBox;
     private readonly ComboBox _statusFilterBox;
     private readonly Dictionary<string, Bitmap> _thumbnailCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly Bitmap _placeholderBitmap;
-    private int _lastAssetCount = -1;
     private bool _refreshing;
     private bool _disposed;
 
     private MediaGalleryController(
         Window window,
         WrapPanel host,
-        StackPanel parent,
         Func<IReadOnlyList<MediaAsset>> getAssets,
         Action<MediaAsset> selectMedia,
         Action saveProject,
+        Action<MediaAsset> removeMedia,
         Action<string> setStatus)
     {
         _window = window;
         _host = host;
-        _parent = parent;
         _getAssets = getAssets;
         _selectMedia = selectMedia;
         _saveProject = saveProject;
+        _removeMedia = removeMedia;
         _setStatus = setStatus;
 
         _searchBox = new TextBox
@@ -73,30 +71,6 @@ public sealed class MediaGalleryController : IDisposable
         _statusFilterBox.SelectionChanged += FilterChanged;
 
         _placeholderBitmap = CreatePlaceholderBitmap();
-
-        int hostIndex = _parent.Children.IndexOf(_parent.Children.OfType<StackPanel>().LastOrDefault() ?? throw new InvalidOperationException("MagmaEdit media list is not available."));
-        Control legacyHost = _parent.Children[hostIndex];
-        _parent.Children.RemoveAt(hostIndex);
-
-        var scrollViewer = new ScrollViewer
-        {
-            HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
-            VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
-            HorizontalContentAlignment = HorizontalAlignment.Stretch,
-            Content = _host
-        };
-        _parent.Children.Insert(hostIndex, scrollViewer);
-        _ = legacyHost;
-
-        var controls = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            Spacing = 8,
-            Children = { _searchBox, _sortBox, _statusFilterBox }
-        };
-        _parent.Children.Insert(hostIndex, controls);
-
-        _window.LayoutUpdated += Window_LayoutUpdated;
         _window.Closed += Window_Closed;
         Refresh();
     }
@@ -107,19 +81,21 @@ public sealed class MediaGalleryController : IDisposable
         Func<IReadOnlyList<MediaAsset>> getAssets,
         Action<MediaAsset> selectMedia,
         Action saveProject,
+        Action<MediaAsset> removeMedia,
         Action<string> setStatus)
     {
         ArgumentNullException.ThrowIfNull(window);
         ArgumentNullException.ThrowIfNull(getAssets);
         ArgumentNullException.ThrowIfNull(selectMedia);
         ArgumentNullException.ThrowIfNull(saveProject);
+        ArgumentNullException.ThrowIfNull(removeMedia);
         ArgumentNullException.ThrowIfNull(setStatus);
-        return CreateForWindow(window, getAssets, selectMedia, saveProject, setStatus);
+        return CreateForWindow(window, getAssets, selectMedia, saveProject, removeMedia, setStatus);
     }
 
     /// <summary>
-    /// Attaches the gallery to a MainWindow without changing its existing layout contract. The reflection
-    /// bridge is confined to this integration boundary so the core editor remains strongly typed.
+    /// Attaches the gallery to MainWindow at the UI integration boundary. Reflection stays isolated here so
+    /// the media gallery does not depend on MainWindow's private implementation details elsewhere.
     /// </summary>
     public static MediaGalleryController Attach(Window window)
     {
@@ -145,12 +121,21 @@ public sealed class MediaGalleryController : IDisposable
             throw new InvalidOperationException("MainWindow gallery state could not be accessed.");
         }
 
-        return CreateForWindow(
+        MediaGalleryController? controller = null;
+        Action saveAndRefresh = () =>
+        {
+            saveMethod.Invoke(window, null);
+            controller?.Refresh();
+        };
+
+        controller = CreateForWindow(
             window,
             () => project.Media,
             asset => selectMethod.Invoke(window, new object[] { asset }),
-            () => saveMethod.Invoke(window, null),
+            saveAndRefresh,
+            asset => project.Media.Remove(asset),
             message => statusText.Text = message);
+        return controller;
     }
 
     private static MediaGalleryController CreateForWindow(
@@ -158,6 +143,7 @@ public sealed class MediaGalleryController : IDisposable
         Func<IReadOnlyList<MediaAsset>> getAssets,
         Action<MediaAsset> selectMedia,
         Action saveProject,
+        Action<MediaAsset> removeMedia,
         Action<string> setStatus)
     {
         if (window.Content is not Grid root || root.Children.Count < 2 || root.Children[1] is not Border mediaBorder)
@@ -176,21 +162,47 @@ public sealed class MediaGalleryController : IDisposable
             throw new InvalidOperationException("MagmaEdit media list is not available.");
         }
 
+        int hostIndex = mediaPanel.Children.IndexOf(legacyHost);
         var host = new WrapPanel
         {
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Top,
-            ItemWidth = 152,
-            ItemHeight = 286,
-            [!WrapPanel.MarginProperty] = new Thickness(2)
+            ItemWidth = 148,
+            ItemHeight = 286
         };
 
-        int hostIndex = mediaPanel.Children.IndexOf(legacyHost);
-        mediaPanel.Children.RemoveAt(hostIndex);
-        mediaPanel.Children.Insert(hostIndex, host);
+        var scrollViewer = new ScrollViewer
+        {
+            HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
+            VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            Content = host
+        };
 
-        return new MediaGalleryController(window, host, mediaPanel, getAssets, selectMedia, saveProject, setStatus);
+        var controls = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Search:",
+                    VerticalAlignment = VerticalAlignment.Center
+                }
+            }
+        };
+
+        mediaPanel.Children.RemoveAt(hostIndex);
+        mediaPanel.Children.Insert(hostIndex, scrollViewer);
+        mediaPanel.Children.Insert(hostIndex, controls);
+
+        var gallery = new MediaGalleryController(window, host, getAssets, selectMedia, saveProject, removeMedia, setStatus);
+        controls.Children.Add(gallery._searchBox);
+        controls.Children.Add(gallery._sortBox);
+        controls.Children.Add(gallery._statusFilterBox);
+        return gallery;
     }
 
     public void Refresh()
@@ -227,7 +239,6 @@ public sealed class MediaGalleryController : IDisposable
                 _host.Children.Add(CreateCard(asset));
             }
 
-            _lastAssetCount = _getAssets().Count;
             _setStatus($"Showing {_host.Children.Count} video{(_host.Children.Count == 1 ? string.Empty : "s")}." +
                        (search.Length == 0 ? string.Empty : $" Search: {search}"));
         }
@@ -287,7 +298,6 @@ public sealed class MediaGalleryController : IDisposable
         publishButton.Click += (_, _) =>
         {
             asset.IsPublished = !asset.IsPublished;
-            publishButton.Content = asset.IsPublished ? "Published" : "Not Published";
             _saveProject();
             _setStatus($"{asset.FileName}: {(asset.IsPublished ? "Published" : "Not Published")}");
         };
@@ -316,13 +326,13 @@ public sealed class MediaGalleryController : IDisposable
 
     private void RemoveFromGallery(MediaAsset asset)
     {
-        IReadOnlyList<MediaAsset> assets = _getAssets();
-        if (assets is not List<MediaAsset> list || !list.Remove(asset))
+        if (!_getAssets().Contains(asset))
         {
-            _setStatus($"Could not remove {asset.FileName} from the gallery.");
+            _setStatus($"{asset.FileName} is no longer in the gallery.");
             return;
         }
 
+        _removeMedia(asset);
         _saveProject();
         _thumbnailCache.Remove(asset.LibraryPath)?.Dispose();
         Refresh();
@@ -364,20 +374,6 @@ public sealed class MediaGalleryController : IDisposable
         catch (Exception)
         {
             // Keep the placeholder when a media item cannot produce a thumbnail.
-        }
-    }
-
-    private void Window_LayoutUpdated(object? sender, EventArgs e)
-    {
-        if (_disposed || _refreshing)
-        {
-            return;
-        }
-
-        int assetCount = _getAssets().Count;
-        if (assetCount != _lastAssetCount)
-        {
-            Refresh();
         }
     }
 
@@ -462,7 +458,6 @@ public sealed class MediaGalleryController : IDisposable
         }
 
         _disposed = true;
-        _window.LayoutUpdated -= Window_LayoutUpdated;
         _window.Closed -= Window_Closed;
         _searchBox.TextChanged -= SearchBox_TextChanged;
         _sortBox.SelectionChanged -= FilterChanged;
