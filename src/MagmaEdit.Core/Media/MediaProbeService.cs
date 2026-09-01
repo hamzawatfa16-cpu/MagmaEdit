@@ -1,5 +1,6 @@
 using Sprocket.Core.Model;
 using Sprocket.Media;
+using Sprocket.Media.Native;
 
 namespace MagmaEdit.Core.Media;
 
@@ -37,31 +38,38 @@ public static class MediaProbeService
         if (!File.Exists(fullPath))
             throw new FileNotFoundException("The media file does not exist.", fullPath);
 
-        ProbedMediaInfo info = MediaSource.ProbeInfo(fullPath);
-        double framesPerSecond = info.FrameRate.Den > 0
-            ? (double)info.FrameRate.Num / info.FrameRate.Den
-            : 0d;
+        try
+        {
+            ProbedMediaInfo info = MediaSource.ProbeInfo(fullPath);
+            double framesPerSecond = info.FrameRate.Den > 0
+                ? (double)info.FrameRate.Num / info.FrameRate.Den
+                : 0d;
 
-        return new MediaProbeResult(
-            Duration: TimeSpan.FromSeconds(info.Duration.ToSeconds()),
-            HasVideo: info.HasVideo,
-            Width: info.Width,
-            Height: info.Height,
-            FramesPerSecond: framesPerSecond,
-            HasAudio: info.HasAudio,
-            SampleRate: info.SampleRate,
-            Channels: info.Channels,
-            HasAlpha: info.HasAlpha,
-            VideoCodec: info.VideoCodec,
-            AudioCodec: info.AudioCodec,
-            PixelFormat: info.PixelFormatName,
-            BitDepth: info.BitDepth,
-            IsHdr: info.IsHdr,
-            IsVariableFrameRate: info.IsVariableFrameRate,
-            ColorRange: info.ColorRange,
-            ColorPrimaries: info.ColorPrimaries,
-            ColorTransfer: info.ColorTransfer,
-            ColorSpace: info.ColorSpace,
-            ChromaSubsampling: info.ChromaSubsampling);
+            return new MediaProbeResult(
+                Duration: TimeSpan.FromSeconds(info.Duration.ToSeconds()),
+                HasVideo: info.HasVideo,
+                Width: info.Width,
+                Height: info.Height,
+                FramesPerSecond: framesPerSecond,
+                HasAudio: info.HasAudio,
+                SampleRate: info.SampleRate,
+                Channels: info.Channels,
+                HasAlpha: info.HasAlpha,
+                VideoCodec: info.VideoCodec,
+                AudioCodec: info.AudioCodec,
+                PixelFormat: info.PixelFormatName,
+                BitDepth: info.BitDepth,
+                IsHdr: info.IsHdr,
+                IsVariableFrameRate: info.IsVariableFrameRate,
+                ColorRange: info.ColorRange,
+                ColorPrimaries: info.ColorPrimaries,
+                ColorTransfer: info.ColorTransfer,
+                ColorSpace: info.ColorSpace,
+                ChromaSubsampling: info.ChromaSubsampling);
+        }
+        catch (FFmpegException exception)
+        {
+            throw new InvalidDataException($"The media file could not be decoded or probed: {exception.Message}", exception);
+        }
     }
 }
