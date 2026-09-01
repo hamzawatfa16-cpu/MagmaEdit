@@ -23,7 +23,7 @@ public sealed class MainWindow : Window
         Content = BuildLayout(layout);
     }
 
-    private static Control BuildLayout(WorkspaceLayout layout)
+    private static Grid BuildLayout(WorkspaceLayout layout)
     {
         var root = new Grid
         {
@@ -34,7 +34,6 @@ public sealed class MainWindow : Window
 
         var header = new Border
         {
-            Grid.ColumnSpan = 3,
             Padding = new Thickness(16, 12),
             Background = Brushes.Transparent,
             Child = new TextBlock
@@ -44,11 +43,11 @@ public sealed class MainWindow : Window
                 FontWeight = FontWeight.SemiBold
             }
         };
+        Grid.SetColumnSpan(header, 3);
         root.Children.Add(header);
 
         var media = new Border
         {
-            Grid.Row = 1,
             Padding = new Thickness(12),
             Child = new StackPanel
             {
@@ -62,12 +61,11 @@ public sealed class MainWindow : Window
                 }
             }
         };
+        Grid.SetRow(media, 1);
         root.Children.Add(media);
 
         var preview = new Border
         {
-            Grid.Row = 1,
-            Grid.Column = 1,
             Margin = new Thickness(12, 0),
             Padding = new Thickness(12),
             BorderThickness = new Thickness(1),
@@ -85,12 +83,12 @@ public sealed class MainWindow : Window
                 }
             }
         };
+        Grid.SetRow(preview, 1);
+        Grid.SetColumn(preview, 1);
         root.Children.Add(preview);
 
         var inspector = new Border
         {
-            Grid.Row = 1,
-            Grid.Column = 2,
             Padding = new Thickness(12),
             Child = new StackPanel
             {
@@ -102,12 +100,12 @@ public sealed class MainWindow : Window
                 }
             }
         };
+        Grid.SetRow(inspector, 1);
+        Grid.SetColumn(inspector, 2);
         root.Children.Add(inspector);
 
         var timeline = new Border
         {
-            Grid.Row = 2,
-            Grid.ColumnSpan = 3,
             Margin = new Thickness(0, 12, 0, 0),
             Padding = new Thickness(12),
             BorderThickness = new Thickness(1),
@@ -122,6 +120,8 @@ public sealed class MainWindow : Window
                 }
             }
         };
+        Grid.SetRow(timeline, 2);
+        Grid.SetColumnSpan(timeline, 3);
         root.Children.Add(timeline);
 
         return root;
