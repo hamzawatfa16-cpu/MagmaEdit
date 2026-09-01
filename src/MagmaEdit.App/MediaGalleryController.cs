@@ -48,7 +48,7 @@ public sealed class MediaGalleryController : IDisposable
 
         _searchBox = new TextBox
         {
-            Watermark = "Search videos by name…",
+            PlaceholderText = "Search videos by name…",
             HorizontalAlignment = HorizontalAlignment.Stretch,
             MinWidth = 110
         };
