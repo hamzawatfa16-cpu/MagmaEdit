@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
@@ -7,6 +8,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Threading;
 using MagmaEdit.Core.Media;
+using MagmaEdit.Core.Projects;
 
 namespace MagmaEdit.App;
 
@@ -81,7 +83,7 @@ public sealed class MediaGalleryController : IDisposable
         Refresh();
     }
 
-    /// <summary>Attaches the gallery to the existing MainWindow media list.</summary>
+    /// <summary>Attaches the gallery using explicit model and UI delegates.</summary>
     public static MediaGalleryController Attach(
         Window window,
         Func<IReadOnlyList<MediaAsset>> getAssets,
@@ -94,7 +96,52 @@ public sealed class MediaGalleryController : IDisposable
         ArgumentNullException.ThrowIfNull(selectMedia);
         ArgumentNullException.ThrowIfNull(saveProject);
         ArgumentNullException.ThrowIfNull(setStatus);
+        return CreateForWindow(window, getAssets, selectMedia, saveProject, setStatus);
+    }
 
+    /// <summary>
+    /// Attaches the gallery to a MainWindow without changing its existing layout contract. The reflection
+    /// bridge is confined to this integration boundary so the core editor remains strongly typed.
+    /// </summary>
+    public static MediaGalleryController Attach(Window window)
+    {
+        ArgumentNullException.ThrowIfNull(window);
+        if (window.GetType() != typeof(MainWindow))
+        {
+            throw new InvalidOperationException("The automatic gallery attachment requires MagmaEdit.MainWindow.");
+        }
+
+        Type type = typeof(MainWindow);
+        FieldInfo projectField = type.GetField("_project", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("MainWindow project field was not found.");
+        FieldInfo statusField = type.GetField("_statusText", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("MainWindow status field was not found.");
+        MethodInfo selectMethod = type.GetMethod("SelectMedia", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("MainWindow media-selection method was not found.");
+        MethodInfo saveMethod = type.GetMethod("SaveProject", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("MainWindow project-save method was not found.");
+
+        if (projectField.GetValue(window) is not ProjectDocument project ||
+            statusField.GetValue(window) is not TextBlock statusText)
+        {
+            throw new InvalidOperationException("MainWindow gallery state could not be accessed.");
+        }
+
+        return CreateForWindow(
+            window,
+            () => project.Media,
+            asset => selectMethod.Invoke(window, new object[] { asset }),
+            () => saveMethod.Invoke(window, null),
+            message => statusText.Text = message);
+    }
+
+    private static MediaGalleryController CreateForWindow(
+        Window window,
+        Func<IReadOnlyList<MediaAsset>> getAssets,
+        Action<MediaAsset> selectMedia,
+        Action saveProject,
+        Action<string> setStatus)
+    {
         if (window.Content is not Grid root || root.Children.Count < 2 || root.Children[1] is not Border mediaBorder)
         {
             throw new InvalidOperationException("MagmaEdit media panel is not available.");
@@ -111,14 +158,7 @@ public sealed class MediaGalleryController : IDisposable
             throw new InvalidOperationException("MagmaEdit media list is not available.");
         }
 
-        return new MediaGalleryController(
-            window,
-            host,
-            mediaPanel,
-            getAssets,
-            selectMedia,
-            saveProject,
-            setStatus);
+        return new MediaGalleryController(window, host, mediaPanel, getAssets, selectMedia, saveProject, setStatus);
     }
 
     public void Refresh()
@@ -239,6 +279,7 @@ public sealed class MediaGalleryController : IDisposable
             {
                 if (_disposed)
                 {
+                    bitmap.Dispose();
                     return;
                 }
 
