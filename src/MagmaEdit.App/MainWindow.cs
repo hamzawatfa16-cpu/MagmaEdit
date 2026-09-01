@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
@@ -53,23 +54,25 @@ public sealed class MainWindow : Window
             }
             catch (InvalidDataException)
             {
-                string recoveryPath = Path.Combine(_workspace.Projects, $"{DefaultProjectName} - Recovery.magmaedit.json");
-                ProjectDocument recovery = ProjectDocument.Create($"{DefaultProjectName} - Recovery");
-                _projectStore.Save(recovery, recoveryPath);
-                return recovery;
+                return CreateRecoveryProject();
             }
             catch (JsonException)
             {
-                string recoveryPath = Path.Combine(_workspace.Projects, $"{DefaultProjectName} - Recovery.magmaedit.json");
-                ProjectDocument recovery = ProjectDocument.Create($"{DefaultProjectName} - Recovery");
-                _projectStore.Save(recovery, recoveryPath);
-                return recovery;
+                return CreateRecoveryProject();
             }
         }
 
         ProjectDocument project = ProjectDocument.Create(DefaultProjectName);
         _projectStore.Save(project, _projectPath);
         return project;
+    }
+
+    private ProjectDocument CreateRecoveryProject()
+    {
+        string recoveryPath = Path.Combine(_workspace.Projects, $"{DefaultProjectName} - Recovery.magmaedit.json");
+        ProjectDocument recovery = ProjectDocument.Create($"{DefaultProjectName} - Recovery");
+        _projectStore.Save(recovery, recoveryPath);
+        return recovery;
     }
 
     private Grid BuildLayout()
