@@ -24,7 +24,6 @@ public sealed class MediaGalleryController : IDisposable
     private readonly ComboBox _sortBox;
     private readonly Dictionary<string, Bitmap> _thumbnailCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly Bitmap _placeholderBitmap;
-    private int _renderedCount = -1;
     private bool _refreshing;
     private bool _disposed;
 
@@ -78,6 +77,7 @@ public sealed class MediaGalleryController : IDisposable
         _parent.Children.Insert(hostIndex, controls);
 
         _host.LayoutUpdated += Host_LayoutUpdated;
+        _window.Closed += Window_Closed;
         Refresh();
     }
 
@@ -147,8 +147,7 @@ public sealed class MediaGalleryController : IDisposable
                 _host.Children.Add(CreateCard(asset));
             }
 
-            _renderedCount = _host.Children.Count;
-            _setStatus($"Showing {_renderedCount} video{(_renderedCount == 1 ? string.Empty : "s")}." +
+            _setStatus($"Showing {_host.Children.Count} video{(_host.Children.Count == 1 ? string.Empty : "s")}." +
                        (search.Length == 0 ? string.Empty : $" Search: {search}"));
         }
         finally
@@ -349,6 +348,8 @@ public sealed class MediaGalleryController : IDisposable
 
     private void SortBox_SelectionChanged(object? sender, SelectionChangedEventArgs e) => Refresh();
 
+    private void Window_Closed(object? sender, EventArgs e) => Dispose();
+
     public void Dispose()
     {
         if (_disposed)
@@ -358,6 +359,7 @@ public sealed class MediaGalleryController : IDisposable
 
         _disposed = true;
         _host.LayoutUpdated -= Host_LayoutUpdated;
+        _window.Closed -= Window_Closed;
         _searchBox.TextChanged -= SearchBox_TextChanged;
         _sortBox.SelectionChanged -= SortBox_SelectionChanged;
 
