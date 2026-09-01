@@ -2,12 +2,18 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Platform.Storage;
+using MagmaEdit.Core.Media;
 using MagmaEdit.Core.Workspace;
 
 namespace MagmaEdit.App;
 
 public sealed class MainWindow : Window
 {
+    private readonly WorkspaceLayout _workspace;
+    private readonly StackPanel _mediaList;
+    private readonly TextBlock _statusText;
+
     public MainWindow()
     {
         Title = "MagmaEdit";
@@ -17,18 +23,20 @@ public sealed class MainWindow : Window
         MinHeight = 640;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
-        WorkspaceLayout layout = WorkspaceLayout.ForCurrentUser();
-        new WorkspaceManager(layout).EnsureCreated();
+        _workspace = WorkspaceLayout.ForCurrentUser();
+        new WorkspaceManager(_workspace).EnsureCreated();
+        _mediaList = new StackPanel { Spacing = 6 };
+        _statusText = new TextBlock { Text = "Ready", Opacity = 0.75, TextWrapping = TextWrapping.Wrap };
 
-        Content = BuildLayout(layout);
+        Content = BuildLayout();
     }
 
-    private static Grid BuildLayout(WorkspaceLayout layout)
+    private Grid BuildLayout()
     {
         var root = new Grid
         {
             RowDefinitions = new RowDefinitions("Auto,*,180"),
-            ColumnDefinitions = new ColumnDefinitions("220,*,280"),
+            ColumnDefinitions = new ColumnDefinitions("260,*,280"),
             Margin = new Thickness(12)
         };
 
@@ -46,6 +54,13 @@ public sealed class MainWindow : Window
         Grid.SetColumnSpan(header, 3);
         root.Children.Add(header);
 
+        var importButton = new Button
+        {
+            Content = "Import Video",
+            HorizontalAlignment = HorizontalAlignment.Left
+        };
+        importButton.Click += ImportButton_Click;
+
         var media = new Border
         {
             Padding = new Thickness(12),
@@ -55,9 +70,11 @@ public sealed class MainWindow : Window
                 Children =
                 {
                     new TextBlock { Text = "Media", FontSize = 18, FontWeight = FontWeight.SemiBold },
-                    new TextBlock { Text = "Import videos into Content Creation\\Media." },
-                    new Button { Content = "Import Video", HorizontalAlignment = HorizontalAlignment.Left },
-                    new TextBlock { Text = layout.Media, TextWrapping = TextWrapping.Wrap, Opacity = 0.65 }
+                    new TextBlock { Text = "Videos are copied into Content Creation\\Media. The original file is left untouched." },
+                    importButton,
+                    _statusText,
+                    new Separator(),
+                    _mediaList
                 }
             }
         };
@@ -125,5 +142,69 @@ public sealed class MainWindow : Window
         root.Children.Add(timeline);
 
         return root;
+    }
+
+    private async void ImportButton_Click(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (!StorageProvider.CanOpen)
+            {
+                _statusText.Text = "File selection is not available on this system.";
+                return;
+            }
+
+            IReadOnlyList<IStorageFile> files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "Import Video",
+                AllowMultiple = true,
+                FileTypeFilter =
+                [
+                    new FilePickerFileType("Video Files")
+                    {
+                        Patterns = ["*.mp4", "*.mov", "*.m4v", "*.webm", "*.mkv", "*.avi"]
+                    }
+                ]
+            });
+
+            if (files.Count == 0)
+            {
+                return;
+            }
+
+            int imported = 0;
+            var importer = new MediaImportService(_workspace);
+
+            foreach (IStorageFile file in files)
+            {
+                string? localPath = file.TryGetLocalPath();
+                if (string.IsNullOrWhiteSpace(localPath))
+                {
+                    continue;
+                }
+
+                MediaAsset asset = importer.Import(localPath);
+                AddMediaItem(asset);
+                imported++;
+            }
+
+            _statusText.Text = imported == 0
+                ? "No local video files were imported."
+                : $"Imported {imported} video{(imported == 1 ? string.Empty : "s")}.";
+        }
+        catch (Exception exception) when (exception is FileNotFoundException or NotSupportedException or IOException or UnauthorizedAccessException)
+        {
+            _statusText.Text = exception.Message;
+        }
+    }
+
+    private void AddMediaItem(MediaAsset asset)
+    {
+        _mediaList.Children.Add(new TextBlock
+        {
+            Text = asset.FileName,
+            TextWrapping = TextWrapping.Wrap,
+            ToolTip = asset.LibraryPath
+        });
     }
 }
