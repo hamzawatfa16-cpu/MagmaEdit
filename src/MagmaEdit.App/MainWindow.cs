@@ -21,6 +21,10 @@ public sealed class MainWindow : Window
     private readonly string _projectPath;
     private readonly StackPanel _mediaList;
     private readonly TextBlock _statusText;
+    private readonly TextBlock _previewText;
+    private readonly TextBlock _inspectorText;
+
+    private MediaAsset? _selectedMedia;
 
     public MainWindow()
     {
@@ -37,7 +41,26 @@ public sealed class MainWindow : Window
         _projectPath = _projectStore.GetDefaultPath(DefaultProjectName);
         _project = LoadOrCreateProject();
         _mediaList = new StackPanel { Spacing = 6 };
-        _statusText = new TextBlock { Text = $"Project: {_project.Name}", Opacity = 0.75, TextWrapping = TextWrapping.Wrap };
+        _statusText = new TextBlock
+        {
+            Text = $"Project: {_project.Name}",
+            Opacity = 0.75,
+            TextWrapping = TextWrapping.Wrap
+        };
+        _previewText = new TextBlock
+        {
+            Text = "No video selected",
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            Opacity = 0.75,
+            TextWrapping = TextWrapping.Wrap,
+            TextAlignment = TextAlignment.Center
+        };
+        _inspectorText = new TextBlock
+        {
+            Text = "Select a media item to inspect it.",
+            TextWrapping = TextWrapping.Wrap
+        };
 
         Closed += MainWindow_Closed;
         Content = BuildLayout();
@@ -134,13 +157,7 @@ public sealed class MainWindow : Window
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
             Background = Brushes.Black,
-            Child = new TextBlock
-            {
-                Text = "No video selected",
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-                Opacity = 0.75
-            }
+            Child = _previewText
         };
 
         var preview = new Border
@@ -163,7 +180,7 @@ public sealed class MainWindow : Window
                 Children =
                 {
                     new TextBlock { Text = "Inspector", FontSize = 18, FontWeight = FontWeight.SemiBold },
-                    new TextBlock { Text = "Select a clip to inspect its properties." }
+                    _inspectorText
                 }
             }
         };
@@ -246,6 +263,7 @@ public sealed class MainWindow : Window
 
             if (imported > 0)
             {
+                SelectMedia(_project.Media[^imported]);
                 _projectStore.Save(_project, _projectPath);
             }
 
@@ -280,13 +298,26 @@ public sealed class MainWindow : Window
 
     private void AddMediaItem(MediaAsset asset)
     {
-        var item = new TextBlock
+        var item = new Button
         {
-            Text = asset.FileName,
-            TextWrapping = TextWrapping.Wrap
+            Content = asset.FileName,
+            HorizontalContentAlignment = HorizontalAlignment.Left,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            ToolTip = asset.LibraryPath
         };
-        ToolTip.SetTip(item, asset.LibraryPath);
+        item.Click += (_, _) => SelectMedia(asset);
         _mediaList.Children.Add(item);
+    }
+
+    private void SelectMedia(MediaAsset asset)
+    {
+        _selectedMedia = asset;
+        _previewText.Text = asset.FileName;
+        _inspectorText.Text =
+            $"Name: {asset.FileName}\n\n" +
+            $"Source: {asset.SourcePath}\n\n" +
+            $"Library: {asset.LibraryPath}";
+        _statusText.Text = $"Selected: {asset.FileName}";
     }
 
     private void MainWindow_Closed(object? sender, EventArgs e)
