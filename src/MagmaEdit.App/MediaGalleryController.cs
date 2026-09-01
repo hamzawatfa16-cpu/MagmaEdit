@@ -196,7 +196,7 @@ public sealed class MediaGalleryController : IDisposable
         }
     }
 
-    private Control CreateCard(MediaAsset asset)
+    private Border CreateCard(MediaAsset asset)
     {
         var thumbnail = new Image
         {
