@@ -459,7 +459,7 @@ public sealed class MainWindow : Window
             });
         }
 
-        _timelineInfoText.Text = $"{_project.Timeline.Tracks.Count} track(s) • { _project.Timeline.Tracks.Sum(track => track.Clips.Count) } clip(s) • {_project.Timeline.Width}×{_project.Timeline.Height} @ {_project.Timeline.FrameRateNumerator}/{_project.Timeline.FrameRateDenominator}";
+        _timelineInfoText.Text = $"{_project.Timeline.Tracks.Count} track(s) • {_project.Timeline.Tracks.Sum(track => track.Clips.Count)} clip(s) • {_project.Timeline.Width}×{_project.Timeline.Height} @ {_project.Timeline.FrameRateNumerator}/{_project.Timeline.FrameRateDenominator}";
     }
 
     private void SaveProject()
