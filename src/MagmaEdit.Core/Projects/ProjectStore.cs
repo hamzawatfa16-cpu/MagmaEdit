@@ -1,4 +1,5 @@
 using System.Text.Json;
+using MagmaEdit.Core.Editing;
 using MagmaEdit.Core.Workspace;
 
 namespace MagmaEdit.Core.Projects;
@@ -65,7 +66,7 @@ public sealed class ProjectStore
         }
 
         string json = File.ReadAllText(fullPath);
-        ProjectDocument? project = JsonSerializer.Deserialize<ProjectDocument>(json, JsonOptions);
+        ProjectDocument? project = DeserializeAndMigrate(json);
         if (project is null)
         {
             throw new InvalidDataException("The project file is empty or invalid.");
@@ -73,6 +74,36 @@ public sealed class ProjectStore
 
         Validate(project);
         return project;
+    }
+
+    private static ProjectDocument? DeserializeAndMigrate(string json)
+    {
+        using JsonDocument document = JsonDocument.Parse(json);
+        int schemaVersion = document.RootElement.TryGetProperty("schemaVersion", out JsonElement value)
+            ? value.GetInt32()
+            : 1;
+
+        ProjectDocument? project = JsonSerializer.Deserialize<ProjectDocument>(json, JsonOptions);
+        if (project is null)
+        {
+            return null;
+        }
+
+        return schemaVersion switch
+        {
+            1 => new ProjectDocument
+            {
+                Id = project.Id,
+                Name = project.Name,
+                SchemaVersion = ProjectDocument.CurrentSchemaVersion,
+                CreatedUtc = project.CreatedUtc,
+                ModifiedUtc = project.ModifiedUtc,
+                Media = project.Media,
+                Timeline = TimelineDocument.CreateDefault()
+            },
+            ProjectDocument.CurrentSchemaVersion => project,
+            _ => throw new InvalidDataException($"Unsupported project schema version: {schemaVersion}.")
+        };
     }
 
     private static void Validate(ProjectDocument project)
@@ -95,6 +126,27 @@ public sealed class ProjectStore
         if (project.CreatedUtc == default)
         {
             throw new InvalidDataException("The project is missing its creation timestamp.");
+        }
+
+        if (project.Timeline is null || project.Timeline.Width <= 0 || project.Timeline.Height <= 0 ||
+            project.Timeline.FrameRateNumerator <= 0 || project.Timeline.FrameRateDenominator <= 0)
+        {
+            throw new InvalidDataException("The project contains invalid timeline settings.");
+        }
+
+        foreach (TimelineTrack track in project.Timeline.Tracks)
+        {
+            if (string.IsNullOrWhiteSpace(track.Id) || string.IsNullOrWhiteSpace(track.Name))
+                throw new InvalidDataException("The project contains an invalid timeline track.");
+
+            foreach (TimelineClip clip in track.Clips)
+            {
+                if (string.IsNullOrWhiteSpace(clip.Id) || string.IsNullOrWhiteSpace(clip.MediaId) ||
+                    clip.TimelineStart.Ticks < 0 || clip.SourceIn.Ticks < 0 || clip.SourceOut <= clip.SourceIn)
+                {
+                    throw new InvalidDataException("The project contains an invalid timeline clip.");
+                }
+            }
         }
     }
 
