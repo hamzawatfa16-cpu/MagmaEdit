@@ -459,16 +459,31 @@ public sealed class MainWindow : Window
             return;
         }
 
-        if (asset.Metadata is not { } metadata || metadata.Duration <= TimeSpan.Zero)
+        if (asset.Metadata is not { } metadata || metadata.Duration <= TimeSpan.Zero || !double.IsFinite(metadata.Duration.TotalSeconds))
         {
-            _statusText.Text = $"Cannot add {asset.FileName}: its duration is unavailable.";
+            _statusText.Text = $"Cannot add {asset.FileName}: its duration is unavailable or invalid.";
             return;
         }
 
-        EditTime duration = EditTime.FromSeconds(metadata.Duration.TotalSeconds);
-        EditTime timelineStart = track.Clips.Count == 0
-            ? EditTime.Zero
-            : track.Clips.Max(clip => clip.TimelineEnd);
+        EditTime duration;
+        EditTime timelineStart;
+        try
+        {
+            duration = EditTime.FromSeconds(metadata.Duration.TotalSeconds);
+            timelineStart = track.Clips.Count == 0
+                ? EditTime.Zero
+                : track.Clips.Max(clip => clip.TimelineEnd);
+        }
+        catch (ArgumentOutOfRangeException exception)
+        {
+            _statusText.Text = $"Cannot add {asset.FileName}: {exception.Message}";
+            return;
+        }
+        catch (OverflowException exception)
+        {
+            _statusText.Text = $"Cannot add {asset.FileName}: the timeline range is too large. {exception.Message}";
+            return;
+        }
 
         var command = new InsertTimelineClipCommand(
             new TimelineEditor(_project.Timeline),
@@ -482,7 +497,7 @@ public sealed class MainWindow : Window
         {
             _history.Execute(command);
         }
-        catch (InvalidOperationException exception)
+        catch (Exception exception) when (exception is InvalidOperationException or ArgumentOutOfRangeException or OverflowException)
         {
             _statusText.Text = $"Could not add {asset.FileName}: {exception.Message}";
             return;
