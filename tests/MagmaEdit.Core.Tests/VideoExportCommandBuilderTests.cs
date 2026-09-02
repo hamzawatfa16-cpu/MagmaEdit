@@ -30,7 +30,7 @@ public sealed class VideoExportCommandBuilderTests
         Assert.True(startInfo.CreateNoWindow);
         Assert.Contains("-filter_complex", startInfo.ArgumentList);
         string filter = startInfo.ArgumentList.Single(argument => argument.Contains("concat=n=2", StringComparison.Ordinal));
-        Assert.Contains("[v0][a0]concat=n=2:v=1:a=1[v][a]", filter);
+        Assert.Contains("[v0][a0][v1][a1]concat=n=2:v=1:a=1[v][a]", filter);
         Assert.Contains("[0:a]aresample=48000", filter);
         Assert.Contains("anullsrc=r=48000:cl=stereo", filter);
         Assert.Contains("-c:v", startInfo.ArgumentList);
