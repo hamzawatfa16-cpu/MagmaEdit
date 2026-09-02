@@ -103,9 +103,17 @@ public sealed class VideoExportService
             throw new NotSupportedException("Export currently supports one populated video track at a time.");
 
         TimelineTrack track = tracks[0];
-        List<VideoExportSegment> segments = new(track.Clips.Count);
-        foreach (TimelineClip clip in track.Clips.OrderBy(item => item.TimelineStart))
+        TimelineClip[] orderedClips = track.Clips.OrderBy(item => item.TimelineStart).ToArray();
+        if (orderedClips[0].TimelineStart != EditTime.Zero)
+            throw new NotSupportedException("Export currently requires the first video clip to start at timeline time zero.");
+
+        List<VideoExportSegment> segments = new(orderedClips.Length);
+        EditTime expectedStart = EditTime.Zero;
+        foreach (TimelineClip clip in orderedClips)
         {
+            if (clip.TimelineStart != expectedStart)
+                throw new NotSupportedException("Export currently requires a contiguous single-track timeline with no gaps.");
+
             MediaAsset media = project.Media.FirstOrDefault(asset =>
                 string.Equals(asset.Id, clip.MediaId, StringComparison.Ordinal))
                 ?? throw new InvalidDataException($"Timeline clip '{clip.Id}' references missing media '{clip.MediaId}'.");
@@ -123,6 +131,7 @@ public sealed class VideoExportService
             }
 
             segments.Add(new VideoExportSegment(media.LibraryPath, clip.SourceIn, clip.Duration));
+            expectedStart = clip.TimelineEnd;
         }
 
         return segments;
