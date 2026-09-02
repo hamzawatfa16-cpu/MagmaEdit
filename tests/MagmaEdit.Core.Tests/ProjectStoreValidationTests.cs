@@ -69,4 +69,36 @@ public sealed class ProjectStoreValidationTests
             }
         }
     }
+
+    [Fact]
+    public void SaveCreatesBackupOfExistingProjectWithoutLeavingTemporaryFiles()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "MagmaEditTests", Guid.NewGuid().ToString("N"));
+        WorkspaceLayout layout = WorkspaceLayout.Create(Path.Combine(root, "Content Creation"));
+        string projectPath = Path.Combine(layout.Projects, "backup-test.magmaedit.json");
+
+        try
+        {
+            ProjectStore store = new(layout);
+            ProjectDocument first = ProjectDocument.Create("Backup Test");
+            store.Save(first, projectPath);
+
+            ProjectDocument second = ProjectDocument.Create("Backup Test Updated");
+            store.Save(second, projectPath);
+
+            string backupPath = ProjectStore.GetBackupPath(projectPath);
+            Assert.True(File.Exists(projectPath));
+            Assert.True(File.Exists(backupPath));
+            Assert.Equal(first.Id, ProjectStore.Load(backupPath).Id);
+            Assert.Equal(second.Id, ProjectStore.Load(projectPath).Id);
+            Assert.Empty(Directory.GetFiles(layout.Projects, "*.tmp", SearchOption.TopDirectoryOnly));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
 }
