@@ -37,7 +37,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Restore
-        run: dotnet restore MagmaEdit.slnx
+        run: dotnet restore MagmaEdit.slnx --runtime win-x64
 
       - name: Verify formatting
         run: dotnet format MagmaEdit.slnx --verify-no-changes --no-restore --exclude ./third_party/sprocket/
@@ -117,6 +117,9 @@ jobs:
             --self-contained true `
             --no-restore `
             --output $publishDir
+          if ($LASTEXITCODE -ne 0) {
+            throw "dotnet publish failed with exit code $LASTEXITCODE."
+          }
 
           foreach ($name in ($env:SPROCKET_FFMPEG8_REQUIRED -split ';')) {
             Copy-Item (Join-Path $env:SPROCKET_FFMPEG8_DIR $name) $publishDir -Force
