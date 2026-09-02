@@ -15,8 +15,8 @@ public readonly record struct EditTime(long Ticks) : IComparable<EditTime>
         return new((long)Math.Round(seconds * TicksPerSecond));
     }
     public double ToSeconds() => (double)Ticks / TicksPerSecond;
-    public static EditTime operator +(EditTime left, EditTime right) => new(left.Ticks + right.Ticks);
-    public static EditTime operator -(EditTime left, EditTime right) => new(left.Ticks - right.Ticks);
+    public static EditTime operator +(EditTime left, EditTime right) => new(checked(left.Ticks + right.Ticks));
+    public static EditTime operator -(EditTime left, EditTime right) => new(checked(left.Ticks - right.Ticks));
     public static bool operator <(EditTime left, EditTime right) => left.Ticks < right.Ticks;
     public static bool operator >(EditTime left, EditTime right) => left.Ticks > right.Ticks;
     public static bool operator <=(EditTime left, EditTime right) => left.Ticks <= right.Ticks;
@@ -199,6 +199,10 @@ public sealed class TimelineEditor
     {
         if (clip.TimelineStart.Ticks < 0 || clip.SourceIn.Ticks < 0 || clip.SourceOut <= clip.SourceIn)
             throw new ArgumentOutOfRangeException(nameof(clip), "Timeline and source ranges are invalid.");
+
+        long duration = clip.SourceOut.Ticks - clip.SourceIn.Ticks;
+        if (clip.TimelineStart.Ticks > long.MaxValue - duration)
+            throw new ArgumentOutOfRangeException(nameof(clip), "Timeline range exceeds the supported time range.");
     }
 
     private static void Sort(TimelineTrack track) =>
