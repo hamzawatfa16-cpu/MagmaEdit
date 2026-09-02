@@ -21,6 +21,7 @@ public sealed class App : Application
             MediaGalleryController gallery = MediaGalleryController.Attach(window);
             window.SetMediaGalleryController(gallery);
             _ = ExportController.Attach(window);
+            _ = UpdateController.Attach(window);
             desktop.MainWindow = window;
         }
 
