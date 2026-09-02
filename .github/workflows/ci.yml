@@ -165,11 +165,3 @@ jobs:
           }
 
           Get-Item $installer | Format-List FullName,Length
-
-      - name: Upload Windows installer artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: MagmaEdit-installer
-          path: artifacts/installer/MagmaEdit-*-Setup.exe
-          if-no-files-found: error
-          retention-days: 14
