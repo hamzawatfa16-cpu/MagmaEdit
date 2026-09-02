@@ -34,12 +34,18 @@ public sealed class MainWindow : Window
     private Button? _undoButton;
     private Button? _redoButton;
     private Button? _addToTimelineButton;
+    private Button? _removeClipButton;
+    private Button? _splitClipButton;
+    private Button? _trimClipButton;
+    private TextBox? _trimSourceInBox;
+    private TextBox? _trimSourceOutBox;
     private Bitmap? _previewBitmap;
     private int _previewGeneration;
     private MediaGalleryController? _mediaGallery;
 
     private MediaAsset? _selectedMedia;
     private TimelineTrack? _selectedTrack;
+    private TimelineClip? _selectedClip;
 
     public MainWindow()
     {
@@ -90,6 +96,7 @@ public sealed class MainWindow : Window
         LoadMediaItems();
         RefreshTimeline();
         UpdateHistoryButtons();
+        UpdateClipActionButtons();
     }
 
     internal void SetMediaGalleryController(MediaGalleryController controller)
@@ -239,17 +246,70 @@ public sealed class MainWindow : Window
         };
         _addToTimelineButton.Click += (_, _) => AddSelectedMediaToTimeline();
 
+        _removeClipButton = new Button
+        {
+            Content = "Remove Selected Clip",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            IsEnabled = false
+        };
+        _removeClipButton.Click += (_, _) => RemoveSelectedClip();
+
+        _splitClipButton = new Button
+        {
+            Content = "Split Selected Clip at Midpoint",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            IsEnabled = false
+        };
+        _splitClipButton.Click += (_, _) => SplitSelectedClip();
+
+        _trimSourceInBox = new TextBox
+        {
+            Watermark = "Source In (seconds)",
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        _trimSourceOutBox = new TextBox
+        {
+            Watermark = "Source Out (seconds)",
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        _trimClipButton = new Button
+        {
+            Content = "Trim Selected Clip",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            IsEnabled = false
+        };
+        _trimClipButton.Click += (_, _) => TrimSelectedClip();
+
+        var trimPanel = new StackPanel
+        {
+            Spacing = 6,
+            Children =
+            {
+                new TextBlock { Text = "Trim source range", FontWeight = FontWeight.SemiBold },
+                _trimSourceInBox,
+                _trimSourceOutBox,
+                _trimClipButton
+            }
+        };
+
         var inspector = new Border
         {
             Padding = new Thickness(12),
-            Child = new StackPanel
+            Child = new ScrollViewer
             {
-                Spacing = 10,
-                Children =
+                VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+                Content = new StackPanel
                 {
-                    new TextBlock { Text = "Inspector", FontSize = 18, FontWeight = FontWeight.SemiBold },
-                    _inspectorText,
-                    _addToTimelineButton
+                    Spacing = 10,
+                    Children =
+                    {
+                        new TextBlock { Text = "Inspector", FontSize = 18, FontWeight = FontWeight.SemiBold },
+                        _inspectorText,
+                        _addToTimelineButton,
+                        _removeClipButton,
+                        _splitClipButton,
+                        trimPanel
+                    }
                 }
             }
         };
@@ -377,9 +437,11 @@ public sealed class MainWindow : Window
         var command = new AddTimelineTrackCommand(_project.Timeline, $"Video {_project.Timeline.Tracks.Count + 1}");
         _history.Execute(command);
         _selectedTrack = command.Track;
+        _selectedClip = null;
         SaveProject();
         _statusText.Text = $"Added track: {_selectedTrack.Name}";
         UpdateHistoryButtons();
+        UpdateClipActionButtons();
     }
 
     private void AddSelectedMediaToTimeline()
@@ -421,9 +483,146 @@ public sealed class MainWindow : Window
             return;
         }
 
+        _selectedClip = track.Clips.FirstOrDefault(clip =>
+            string.Equals(clip.Id, command.Clip.Id, StringComparison.Ordinal));
         SaveProject();
         _statusText.Text = $"Added {asset.FileName} to {track.Name}.";
         UpdateHistoryButtons();
+        UpdateClipActionButtons();
+    }
+
+    private void RemoveSelectedClip()
+    {
+        TimelineTrack? track = _selectedTrack;
+        TimelineClip? clip = _selectedClip;
+        if (track is null || clip is null)
+        {
+            _statusText.Text = "Select a timeline clip first.";
+            return;
+        }
+
+        if (!track.Clips.Any(existing => string.Equals(existing.Id, clip.Id, StringComparison.Ordinal)))
+        {
+            _statusText.Text = "The selected clip is no longer on the selected track.";
+            _selectedClip = null;
+            UpdateClipActionButtons();
+            return;
+        }
+
+        try
+        {
+            _history.Execute(new RemoveTimelineClipCommand(
+                new TimelineEditor(_project.Timeline),
+                track.Id,
+                clip.Id));
+        }
+        catch (KeyNotFoundException exception)
+        {
+            _statusText.Text = exception.Message;
+            return;
+        }
+
+        _selectedClip = null;
+        SaveProject();
+        _statusText.Text = $"Removed clip from {track.Name}.";
+        UpdateHistoryButtons();
+        UpdateClipActionButtons();
+    }
+
+    private void SplitSelectedClip()
+    {
+        TimelineTrack? track = _selectedTrack;
+        TimelineClip? clip = _selectedClip;
+        if (track is null || clip is null)
+        {
+            _statusText.Text = "Select a timeline clip first.";
+            return;
+        }
+
+        EditTime midpoint = clip.TimelineStart + new EditTime(clip.Duration.Ticks / 2);
+        if (midpoint <= clip.TimelineStart || midpoint >= clip.TimelineEnd)
+        {
+            _statusText.Text = "The selected clip is too short to split.";
+            return;
+        }
+
+        var command = new SplitTimelineClipCommand(
+            new TimelineEditor(_project.Timeline),
+            track.Id,
+            clip.Id,
+            midpoint);
+
+        try
+        {
+            _history.Execute(command);
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or KeyNotFoundException or ArgumentOutOfRangeException)
+        {
+            _statusText.Text = $"Could not split clip: {exception.Message}";
+            return;
+        }
+
+        _selectedClip = track.Clips.FirstOrDefault(candidate =>
+            candidate.TimelineStart == midpoint);
+        SaveProject();
+        _statusText.Text = $"Split clip on {track.Name}.";
+        UpdateHistoryButtons();
+        UpdateClipActionButtons();
+    }
+
+    private void TrimSelectedClip()
+    {
+        TimelineTrack? track = _selectedTrack;
+        TimelineClip? clip = _selectedClip;
+        if (track is null || clip is null || _trimSourceInBox is null || _trimSourceOutBox is null)
+        {
+            _statusText.Text = "Select a timeline clip first.";
+            return;
+        }
+
+        if (!double.TryParse(_trimSourceInBox.Text, out double sourceInSeconds) ||
+            !double.TryParse(_trimSourceOutBox.Text, out double sourceOutSeconds))
+        {
+            _statusText.Text = "Enter valid source-in and source-out seconds.";
+            return;
+        }
+
+        EditTime sourceIn = EditTime.FromSeconds(sourceInSeconds);
+        EditTime sourceOut = EditTime.FromSeconds(sourceOutSeconds);
+        if (sourceIn < EditTime.Zero || sourceOut <= sourceIn)
+        {
+            _statusText.Text = "Source Out must be greater than Source In, and both must be non-negative.";
+            return;
+        }
+
+        var command = new TrimTimelineClipCommand(
+            new TimelineEditor(_project.Timeline),
+            track.Id,
+            clip.Id,
+            sourceIn,
+            sourceOut);
+
+        try
+        {
+            _history.Execute(command);
+        }
+        catch (ArgumentOutOfRangeException exception)
+        {
+            _statusText.Text = $"Could not trim clip: {exception.Message}";
+            return;
+        }
+        catch (InvalidOperationException exception)
+        {
+            _statusText.Text = $"Could not trim clip: {exception.Message}";
+            return;
+        }
+
+        _selectedClip = track.Clips.FirstOrDefault(candidate =>
+            string.Equals(candidate.Id, clip.Id, StringComparison.Ordinal));
+        SaveProject();
+        _statusText.Text = $"Trimmed clip on {track.Name}.";
+        UpdateHistoryButtons();
+        UpdateClipActionButtons();
     }
 
     private void Undo()
@@ -436,8 +635,10 @@ public sealed class MainWindow : Window
         }
 
         SaveProject();
+        _selectedClip = null;
         _statusText.Text = "Undo complete.";
         UpdateHistoryButtons();
+        UpdateClipActionButtons();
     }
 
     private void Redo()
@@ -450,8 +651,10 @@ public sealed class MainWindow : Window
         }
 
         SaveProject();
+        _selectedClip = null;
         _statusText.Text = "Redo complete.";
         UpdateHistoryButtons();
+        UpdateClipActionButtons();
     }
 
     private void UpdateHistoryButtons()
@@ -464,6 +667,31 @@ public sealed class MainWindow : Window
         if (_redoButton is not null)
         {
             _redoButton.IsEnabled = _history.CanRedo;
+        }
+    }
+
+    private void UpdateClipActionButtons()
+    {
+        bool clipSelected = _selectedClip is not null && _selectedTrack is not null;
+        if (_removeClipButton is not null)
+        {
+            _removeClipButton.IsEnabled = clipSelected;
+        }
+
+        if (_splitClipButton is not null)
+        {
+            _splitClipButton.IsEnabled = clipSelected && _selectedClip!.Duration.Ticks >= 2;
+        }
+
+        if (_trimClipButton is not null)
+        {
+            _trimClipButton.IsEnabled = clipSelected;
+        }
+
+        if (_trimSourceInBox is not null && _trimSourceOutBox is not null && clipSelected)
+        {
+            _trimSourceInBox.Text = _selectedClip!.SourceIn.ToSeconds().ToString("0.###");
+            _trimSourceOutBox.Text = _selectedClip.SourceOut.ToSeconds().ToString("0.###");
         }
     }
 
@@ -501,12 +729,14 @@ public sealed class MainWindow : Window
     private void SelectMedia(MediaAsset asset)
     {
         _selectedMedia = asset;
+        _selectedClip = null;
         int generation = ++_previewGeneration;
         ShowPreviewLoadingState(asset);
         if (_addToTimelineButton is not null)
         {
             _addToTimelineButton.IsEnabled = asset.Metadata is { Duration: > TimeSpan.Zero };
         }
+        UpdateClipActionButtons();
 
         if (asset.Metadata is { } metadata)
         {
@@ -617,8 +847,10 @@ public sealed class MainWindow : Window
             selectTrack.Click += (_, _) =>
             {
                 _selectedTrack = track;
+                _selectedClip = null;
                 _statusText.Text = $"Selected track: {track.Name}";
                 RefreshTimeline();
+                UpdateClipActionButtons();
             };
             trackHeader.Children.Add(selectTrack);
             trackHeader.Children.Add(new TextBlock
@@ -643,14 +875,17 @@ public sealed class MainWindow : Window
                 };
                 clipButton.Click += (_, _) =>
                 {
+                    _selectedTrack = track;
+                    _selectedClip = clip;
                     _statusText.Text = $"Selected clip: {mediaName}";
                     _inspectorText.Text =
                         $"Clip ID: {clip.Id}\n\n" +
                         $"Track: {track.Name}\n\n" +
-                        $"Start: {clip.TimelineStart.ToSeconds():0.###} s\n" +
-                        $"Duration: {clip.Duration.ToSeconds():0.###} s\n" +
+                        $"Start: {clip.TimelineStart.ToSeconds():0.###} s\n\n" +
+                        $"Duration: {clip.Duration.ToSeconds():0.###} s\n\n" +
                         $"Source In: {clip.SourceIn.ToSeconds():0.###} s\n" +
                         $"Source Out: {clip.SourceOut.ToSeconds():0.###} s";
+                    UpdateClipActionButtons();
                 };
                 trackPanel.Children.Add(clipButton);
             }
