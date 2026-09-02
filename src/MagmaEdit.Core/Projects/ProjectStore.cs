@@ -166,10 +166,20 @@ public sealed class ProjectStore
                     throw new InvalidDataException("The project contains an invalid timeline clip.");
                 }
 
+                EditTime timelineEnd;
+                try
+                {
+                    timelineEnd = clip.TimelineEnd;
+                }
+                catch (OverflowException exception)
+                {
+                    throw new InvalidDataException("The project contains a timeline clip outside the supported time range.", exception);
+                }
+
                 if (previousEnd is { } end && clip.TimelineStart < end)
                     throw new InvalidDataException("The project contains overlapping clips on a timeline track.");
 
-                previousEnd = clip.TimelineEnd;
+                previousEnd = timelineEnd;
             }
         }
     }
