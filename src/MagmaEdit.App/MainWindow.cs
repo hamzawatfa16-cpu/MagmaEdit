@@ -175,7 +175,7 @@ public sealed class MainWindow : Window
 
     private (ProjectDocument Project, string Path) CreateRecoveryProject()
     {
-        string recoveryPath = _projectStore.GetUniqueProjectPath($"{DefaultProjectName} - Recovery");
+        string recoveryPath = _projectSession.GetNewProjectPath($"{DefaultProjectName} - Recovery");
         ProjectDocument recovery = ProjectDocument.Create($"{DefaultProjectName} - Recovery");
         _projectStore.Save(recovery, recoveryPath);
         ProjectDocument openedRecovery = _projectSession.Open(recoveryPath);
