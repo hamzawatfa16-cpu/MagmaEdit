@@ -67,7 +67,6 @@ internal sealed class ExportController
             UnauthorizedAccessException)
         {
             _button.Content = "Export Failed";
-            _button.ToolTip = exception.Message;
             await Task.Delay(TimeSpan.FromSeconds(2)).ConfigureAwait(true);
         }
         finally
