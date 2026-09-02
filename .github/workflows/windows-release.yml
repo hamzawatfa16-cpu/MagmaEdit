@@ -83,6 +83,9 @@ jobs:
               throw "Required FFmpeg 8 native library is missing: $name"
             }
           }
+          if (-not (Test-Path (Join-Path $ffmpegBin 'ffmpeg.exe'))) {
+            throw 'FFmpeg 8 archive was downloaded, but ffmpeg.exe was not found.'
+          }
 
           "SPROCKET_FFMPEG8_DIR=$ffmpegBin" >> $env:GITHUB_ENV
           "SPROCKET_FFMPEG8_REQUIRED=$($required -join ';')" >> $env:GITHUB_ENV
@@ -105,9 +108,13 @@ jobs:
           foreach ($name in ($env:SPROCKET_FFMPEG8_REQUIRED -split ';')) {
             Copy-Item (Join-Path $env:SPROCKET_FFMPEG8_DIR $name) $publishDir -Force
           }
+          Copy-Item (Join-Path $env:SPROCKET_FFMPEG8_DIR 'ffmpeg.exe') $publishDir -Force
 
           if (-not (Test-Path (Join-Path $publishDir 'MagmaEdit.exe'))) {
             throw 'The Windows publish output does not contain MagmaEdit.exe.'
+          }
+          if (-not (Test-Path (Join-Path $publishDir 'ffmpeg.exe'))) {
+            throw 'The Windows publish output does not contain ffmpeg.exe.'
           }
 
       - name: Install Inno Setup
