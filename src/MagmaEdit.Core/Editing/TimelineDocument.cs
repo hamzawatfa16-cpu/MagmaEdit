@@ -99,6 +99,8 @@ public sealed class TimelineEditor
         _timeline = timeline ?? throw new ArgumentNullException(nameof(timeline));
     }
 
+    public TimelineDocument Timeline => _timeline;
+
     public TimelineClip InsertClip(string trackId, string mediaId, EditTime timelineStart, EditTime sourceIn, EditTime sourceOut)
     {
         TimelineClip clip = TimelineClip.Create(mediaId, timelineStart, sourceIn, sourceOut);
