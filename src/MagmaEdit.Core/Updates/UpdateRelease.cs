@@ -46,7 +46,7 @@ public sealed record UpdateRelease(
                 foreach (JsonElement asset in assets.EnumerateArray())
                 {
                     string? name = TryGetString(asset, "name");
-                    if (!string.Equals(name, $"MagmaEdit-{version}.Setup.exe", StringComparison.Ordinal))
+                    if (!string.Equals(name, $"MagmaEdit-{version}-Setup.exe", StringComparison.Ordinal))
                         continue;
 
                     string browserDownloadUrl = GetRequiredString(asset, "browser_download_url");
