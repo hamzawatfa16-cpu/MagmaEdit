@@ -44,4 +44,29 @@ public sealed class ProjectStoreValidationTests
             }
         }
     }
+
+    [Fact]
+    public void LoadNormalizesMalformedJsonValueShapeToInvalidData()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "MagmaEditTests", Guid.NewGuid().ToString("N"));
+        string projectPath = Path.Combine(root, "broken.magmaedit.json");
+
+        try
+        {
+            Directory.CreateDirectory(root);
+            File.WriteAllText(projectPath, "{\"schemaVersion\":\"broken\"}");
+
+            InvalidDataException exception = Assert.Throws<InvalidDataException>(() =>
+                ProjectStore.Load(projectPath));
+
+            Assert.Contains("invalid JSON value shape", exception.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
 }
