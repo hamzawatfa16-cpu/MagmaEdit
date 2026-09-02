@@ -35,6 +35,7 @@ public sealed class MainWindow : Window
     private Button? _redoButton;
     private Bitmap? _previewBitmap;
     private int _previewGeneration;
+    private MediaGalleryController? _mediaGallery;
 
     private MediaAsset? _selectedMedia;
     private TimelineTrack? _selectedTrack;
@@ -88,6 +89,13 @@ public sealed class MainWindow : Window
         LoadMediaItems();
         RefreshTimeline();
         UpdateHistoryButtons();
+    }
+
+    internal void SetMediaGalleryController(MediaGalleryController controller)
+    {
+        ArgumentNullException.ThrowIfNull(controller);
+        _mediaGallery = controller;
+        _mediaGallery.Refresh();
     }
 
     private ProjectDocument LoadOrCreateProject()
@@ -325,7 +333,6 @@ public sealed class MainWindow : Window
                 {
                     MediaAsset asset = importer.Import(normalizedSource);
                     _project.Media.Add(asset);
-                    AddMediaItem(asset);
                     lastImportedAsset = asset;
                     imported++;
                 }
@@ -344,6 +351,7 @@ public sealed class MainWindow : Window
             {
                 SaveProject();
                 SelectMedia(lastImportedAsset);
+                _mediaGallery?.Refresh();
             }
 
             _statusText.Text = BuildImportStatus(imported, alreadyImported, failed);
@@ -415,6 +423,12 @@ public sealed class MainWindow : Window
 
     private void AddMediaItem(MediaAsset asset)
     {
+        if (_mediaGallery is not null)
+        {
+            _mediaGallery.Refresh();
+            return;
+        }
+
         var item = new Button
         {
             Content = asset.FileName,
