@@ -63,7 +63,7 @@ public sealed record UpdateRelease(
                         throw new InvalidDataException("The GitHub release installer SHA-256 digest is invalid.");
 
                     string? uploader = TryGetNestedLogin(asset, "uploader");
-                    return new UpdateRelease(version, tagName, name, installerUri, size, sha256.ToUpperInvariant(), author, uploader);
+                    return new UpdateRelease(version, tagName, name!, installerUri, size, sha256.ToUpperInvariant(), author, uploader);
                 }
             }
         }
