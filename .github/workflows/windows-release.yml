@@ -2,7 +2,7 @@ name: Windows Release
 
 on:
   push:
-    tags: ['v*']
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   package-windows:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[release-v1]')
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -34,8 +35,14 @@ jobs:
       - name: Restore
         run: dotnet restore MagmaEdit.slnx --runtime win-x64
 
+      - name: Verify formatting
+        run: dotnet format MagmaEdit.slnx --verify-no-changes --no-restore --exclude ./third_party/sprocket/
+
       - name: Build
         run: dotnet build MagmaEdit.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test MagmaEdit.slnx --configuration Release --no-build --verbosity normal
 
       - name: Prepare FFmpeg 8 natives
         shell: pwsh
@@ -133,8 +140,8 @@ jobs:
           }
           New-Item -ItemType Directory -Path $installerDir -Force | Out-Null
 
-          if ($env:GITHUB_REF -like 'refs/tags/v*') {
-            $version = $env:GITHUB_REF_NAME.Substring(1)
+          if ($env:GITHUB_EVENT_NAME -eq 'push' -and $env:GITHUB_REF_NAME -eq 'main') {
+            $version = '1.0.0'
           }
           else {
             $version = "0.1.0.${{ github.run_number }}"
@@ -157,19 +164,11 @@ jobs:
 
           Write-Host "Created installer: $($installer.FullName)"
 
-      - name: Upload Windows installer
-        uses: actions/upload-artifact@v4
-        with:
-          name: MagmaEdit-installer
-          path: artifacts/installer/*-Setup.exe
-          if-no-files-found: error
-          retention-days: 30
-
       - name: Publish GitHub release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name == 'push' && github.ref_name == 'main'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $installer = (Get-ChildItem artifacts\installer -Filter '*-Setup.exe' -File | Select-Object -First 1).FullName
-          gh release create $env:GITHUB_REF_NAME $installer --title "MagmaEdit $env:GITHUB_REF_NAME" --generate-notes
+          gh release create v1.0.0 $installer --title 'MagmaEdit v1' --notes 'MagmaEdit v1 Windows installer. Download the .exe below and install normally; no terminal is required.'
