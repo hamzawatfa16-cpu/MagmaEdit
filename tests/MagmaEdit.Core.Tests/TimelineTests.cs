@@ -104,4 +104,20 @@ public sealed class TimelineTests
         Assert.Throws<ArgumentOutOfRangeException>(() => EditTime.FromSeconds(double.PositiveInfinity));
         Assert.Throws<ArgumentOutOfRangeException>(() => EditTime.FromSeconds(double.NegativeInfinity));
     }
+
+    [Fact]
+    public void InsertRejectsTimelineEndOverflow()
+    {
+        TimelineDocument timeline = TimelineDocument.CreateDefault();
+        TimelineTrack track = timeline.AddTrack("Video 1");
+        TimelineEditor editor = new(timeline);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            editor.InsertClip(
+                track.Id,
+                "media",
+                new EditTime(long.MaxValue - 1),
+                EditTime.Zero,
+                new EditTime(2)));
+    }
 }
