@@ -95,7 +95,7 @@ public sealed class VideoExportService
         }
     }
 
-    private static IReadOnlyList<VideoExportSegment> BuildSegments(ProjectDocument project)
+    private static List<VideoExportSegment> BuildSegments(ProjectDocument project)
     {
         TimelineTrack[] tracks = project.Timeline.Tracks.Where(track => track.Clips.Count > 0).ToArray();
         if (tracks.Length == 0)
