@@ -68,7 +68,7 @@ public sealed class RenameMediaAssetCommand : IEditCommand
             throw new ArgumentException("Media names cannot exceed 255 characters.", nameof(fileName));
         }
 
-        if (trimmed is "." or ".." || trimmed.Any(char.IsControl))
+        if (trimmed is "." or ".." || trimmed.Any(char.IsControl) || trimmed.Contains('/') || trimmed.Contains('\\'))
         {
             throw new ArgumentException("Media names must be normal display names.", nameof(fileName));
         }
