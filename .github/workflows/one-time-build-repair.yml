@@ -20,22 +20,23 @@ jobs:
         run: |
           $dialogPath = 'src/MagmaEdit.App/ProjectNameDialog.cs'
           $dialog = [System.IO.File]::ReadAllText($dialogPath)
-          $dialogPattern = '            SelectAllOnFocus = true,\r?\n'
-          $dialogMatches = [regex]::Matches($dialog, $dialogPattern)
-          if ($dialogMatches.Count -ne 1) {
-            throw "Expected exactly one unsupported SelectAllOnFocus property; found $($dialogMatches.Count)."
+          $dialogText = "            SelectAllOnFocus = true,$([Environment]::NewLine)"
+          $dialogCount = ([regex]::Matches($dialog, [regex]::Escape($dialogText))).Count
+          if ($dialogCount -ne 1) {
+            throw "Expected exactly one unsupported SelectAllOnFocus property; found $dialogCount."
           }
-          $dialog = [regex]::Replace($dialog, $dialogPattern, '')
+          $dialog = $dialog.Replace($dialogText, '')
           [System.IO.File]::WriteAllText($dialogPath, $dialog, [System.Text.UTF8Encoding]::new($false))
 
           $windowPath = 'src/MagmaEdit.App/MainWindow.cs'
           $window = [System.IO.File]::ReadAllText($windowPath)
-          $windowPattern = '            ProjectDocument project = _projectSession\.Open\(defaultPath\);\r?\n            return \(project, defaultPath\);'
-          $windowMatches = [regex]::Matches($window, $windowPattern)
-          if ($windowMatches.Count -ne 1) {
-            throw "Expected exactly one overlapping project declaration; found $($windowMatches.Count)."
+          $oldBlock = "            ProjectDocument project = _projectSession.Open(defaultPath);$([Environment]::NewLine)            return (project, defaultPath);"
+          $windowCount = ([regex]::Matches($window, [regex]::Escape($oldBlock))).Count
+          if ($windowCount -ne 1) {
+            throw "Expected exactly one overlapping project declaration; found $windowCount."
           }
-          $window = [regex]::Replace($window, $windowPattern, '            ProjectDocument loadedProject = _projectSession.Open(defaultPath);`r`n            return (loadedProject, defaultPath);')
+          $newBlock = "            ProjectDocument loadedProject = _projectSession.Open(defaultPath);$([Environment]::NewLine)            return (loadedProject, defaultPath);"
+          $window = $window.Replace($oldBlock, $newBlock)
           [System.IO.File]::WriteAllText($windowPath, $window, [System.Text.UTF8Encoding]::new($false))
 
       - name: Normalize tracked C# line endings
