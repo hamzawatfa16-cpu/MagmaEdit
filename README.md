@@ -4,7 +4,20 @@ MagmaEdit is a Windows-first video editor designed for normal editing workflows 
 
 ## Project status
 
-**Foundation stage — first executable core scaffold.** The repository now contains the first MagmaEdit-owned Core project, workspace contract, reversible edit history, tests, and Windows CI gates. The Sprocket foundation remains under controlled audit; large upstream source import is deliberately not mixed into the repository until the dependency and licensing boundary is approved.
+**Foundation stage — functional editor core.** The repository now contains a working Windows desktop editor shell with a local video library, 9:16 preview/playback, timeline tracks and clips, reversible edit history, trim/split/remove commands, FFmpeg-backed export, a Windows installer pipeline, and a verified in-app update path. The Sprocket foundation remains under controlled audit; large upstream source import is deliberately not mixed into the repository until the dependency and licensing boundary is approved.
+
+## Current capabilities
+
+- Windows desktop application shell.
+- Local-first `Videos\Content Creation` workspace with Media, Projects, Exports, and Cache folders.
+- Video-only media import into the managed Media library.
+- Gallery search, newest/oldest sorting, and Published/Not Published filtering.
+- 9:16 preview surface with first-frame preview and FFmpeg-backed playback/scrubbing.
+- Timeline tracks with add/remove/split/trim editing commands.
+- Shared Undo/Redo edit history.
+- Real FFmpeg-backed MP4 export at the supported 1080×1920 output format.
+- Windows installer packaging through GitHub Actions and Inno Setup.
+- In-app stable-release updater with release provenance, size, SHA-256, executable-header, and redirect validation.
 
 ## Product direction
 
@@ -22,12 +35,12 @@ MagmaEdit is a Windows-first video editor designed for normal editing workflows 
 ```text
 MagmaEdit/
 ├── src/
+│   ├── MagmaEdit.App/
 │   └── MagmaEdit.Core/
-│       ├── Editing/
-│       └── Workspace/
 ├── tests/
 │   └── MagmaEdit.Core.Tests/
 ├── docs/
+├── installer/
 ├── .github/
 │   └── workflows/
 ├── MagmaEdit.slnx
