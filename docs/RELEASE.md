@@ -8,4 +8,4 @@ The application updater checks the official latest stable MagmaEdit GitHub relea
 
 The first version containing the in-app updater is **1.0.1**. Users running 1.0.0 must install 1.0.1 once from GitHub Releases. After that, compatible future releases can be installed from the MagmaEdit **Update** button without manually downloading each installer.
 
-The 1.0.1 release is the verification release for the in-app update system, including secure release validation, SHA-256 verification, and direct installer execution without a terminal.
+The 1.0.1 release is the verification release for the in-app update system, including secure release validation, SHA-256 verification, direct installer execution without a terminal, and hardened persisted-project error handling.
