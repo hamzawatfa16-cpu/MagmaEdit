@@ -17,14 +17,30 @@ public sealed class App : Application
         if (ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
         {
             var window = new MainWindow();
-            _ = PreviewPlaybackController.Attach(window);
-            MediaGalleryController gallery = MediaGalleryController.Attach(window);
-            window.SetMediaGalleryController(gallery);
-            _ = ExportController.Attach(window);
-            _ = UpdateController.Attach(window);
             desktop.MainWindow = window;
+
+            TryAttach("preview playback", () => _ = PreviewPlaybackController.Attach(window));
+            TryAttach("media gallery", () =>
+            {
+                MediaGalleryController gallery = MediaGalleryController.Attach(window);
+                window.SetMediaGalleryController(gallery);
+            });
+            TryAttach("export controller", () => _ = ExportController.Attach(window));
+            TryAttach("update controller", () => _ = UpdateController.Attach(window));
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private static void TryAttach(string componentName, Action attach)
+    {
+        try
+        {
+            attach();
+        }
+        catch (Exception exception)
+        {
+            StartupDiagnostics.WriteComponentFailure(componentName, exception);
+        }
     }
 }
