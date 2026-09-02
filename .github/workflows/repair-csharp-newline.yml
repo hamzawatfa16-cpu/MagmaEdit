@@ -1,0 +1,45 @@
+name: Repair CSharp Newlines
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          submodules: false
+
+      - name: Repair tracked C# final newlines
+        shell: pwsh
+        run: |
+          $changed = $false
+          $files = git ls-files '*.cs' | Where-Object { $_ -notlike 'third_party/sprocket/*' }
+          foreach ($path in $files) {
+            $bytes = [IO.File]::ReadAllBytes($path)
+            if ($bytes.Length -eq 0) { continue }
+            if ($bytes.Length -ge 2 -and $bytes[-2] -eq 13 -and $bytes[-1] -eq 10) { continue }
+            $text = [Text.Encoding]::UTF8.GetString($bytes).TrimEnd("`r", "`n") + "`r`n"
+            [IO.File]::WriteAllText($path, $text, [Text.UTF8Encoding]::new($false))
+            $changed = $true
+          }
+
+          if (-not $changed) {
+            Write-Host 'No C# final-newline repairs were necessary.'
+            exit 0
+          }
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- '*.cs'
+          if (-not (git diff --cached --quiet)) {
+            git commit -m 'Normalize C# final newlines'
+            git push
+          }
