@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using Avalonia;
@@ -264,12 +265,12 @@ public sealed class MainWindow : Window
 
         _trimSourceInBox = new TextBox
         {
-            Watermark = "Source In (seconds)",
+            PlaceholderText = "Source In (seconds)",
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
         _trimSourceOutBox = new TextBox
         {
-            Watermark = "Source Out (seconds)",
+            PlaceholderText = "Source Out (seconds)",
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
         _trimClipButton = new Button
@@ -580,8 +581,8 @@ public sealed class MainWindow : Window
             return;
         }
 
-        if (!double.TryParse(_trimSourceInBox.Text, out double sourceInSeconds) ||
-            !double.TryParse(_trimSourceOutBox.Text, out double sourceOutSeconds))
+        if (!double.TryParse(_trimSourceInBox.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out double sourceInSeconds) ||
+            !double.TryParse(_trimSourceOutBox.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out double sourceOutSeconds))
         {
             _statusText.Text = "Enter valid source-in and source-out seconds.";
             return;
@@ -690,8 +691,8 @@ public sealed class MainWindow : Window
 
         if (_trimSourceInBox is not null && _trimSourceOutBox is not null && clipSelected)
         {
-            _trimSourceInBox.Text = _selectedClip!.SourceIn.ToSeconds().ToString("0.###");
-            _trimSourceOutBox.Text = _selectedClip.SourceOut.ToSeconds().ToString("0.###");
+            _trimSourceInBox.Text = _selectedClip!.SourceIn.ToSeconds().ToString("0.###", CultureInfo.InvariantCulture);
+            _trimSourceOutBox.Text = _selectedClip.SourceOut.ToSeconds().ToString("0.###", CultureInfo.InvariantCulture);
         }
     }
 
@@ -734,7 +735,7 @@ public sealed class MainWindow : Window
         ShowPreviewLoadingState(asset);
         if (_addToTimelineButton is not null)
         {
-            _addToTimelineButton.IsEnabled = asset.Metadata is { Duration: > TimeSpan.Zero };
+            _addToTimelineButton.IsEnabled = asset.Metadata is { } metadata && metadata.Duration > TimeSpan.Zero;
         }
         UpdateClipActionButtons();
 
