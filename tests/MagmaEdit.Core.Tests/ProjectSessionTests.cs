@@ -48,7 +48,7 @@ public sealed class ProjectSessionTests
 
             ProjectSession session = new(layout);
             ProjectDocument opened = session.Open(path);
-            opened.Name.AssertUnchanged();
+            Assert.Equal("Open Me", opened.Name);
             opened.ModifiedUtc = DateTimeOffset.UtcNow.AddMinutes(1);
             session.Save();
 
