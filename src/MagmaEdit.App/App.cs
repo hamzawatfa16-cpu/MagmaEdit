@@ -18,7 +18,8 @@ public sealed class App : Application
         {
             var window = new MainWindow();
             _ = PreviewPlaybackController.Attach(window);
-            _ = MediaGalleryController.Attach(window);
+            MediaGalleryController gallery = MediaGalleryController.Attach(window);
+            window.SetMediaGalleryController(gallery);
             desktop.MainWindow = window;
         }
 
