@@ -1,0 +1,165 @@
+name: Windows Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Verify Sprocket foundation checkout
+        shell: pwsh
+        run: |
+          $expected = '8c35b7604d5e859931dd83146b3a430591860d94'
+          $head = (git -C third_party/sprocket rev-parse HEAD).Trim()
+          if ($head -ne $expected) {
+            throw "Sprocket submodule is at $head; expected $expected"
+          }
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore MagmaEdit.slnx
+
+      - name: Build
+        run: dotnet build MagmaEdit.slnx --configuration Release --no-restore
+
+      - name: Prepare FFmpeg 8 natives
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $headers = @{
+            Authorization = "Bearer $env:GH_TOKEN"
+            Accept = 'application/vnd.github+json'
+            'X-GitHub-Api-Version' = '2026-03-10'
+            'User-Agent' = 'MagmaEdit-Release'
+          }
+
+          $release = Invoke-RestMethod -Uri 'https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/tags/latest' -Headers $headers
+          $asset = $release.assets |
+            Where-Object {
+              $_.name -match 'win64-gpl-shared' -and
+              $_.name -match 'n8\.' -and
+              $_.name -match '\.zip$'
+            } |
+            Select-Object -First 1
+
+          if (-not $asset) {
+            throw 'Could not find a Windows FFmpeg 8 win64-gpl-shared ZIP in the latest BtbN release.'
+          }
+
+          $archive = Join-Path $env:RUNNER_TEMP $asset.name
+          $extractRoot = Join-Path $env:RUNNER_TEMP 'MagmaEdit-FFmpeg8'
+          if (Test-Path $extractRoot) {
+            Remove-Item $extractRoot -Recurse -Force
+          }
+
+          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $archive
+          Expand-Archive -Path $archive -DestinationPath $extractRoot -Force
+
+          $ffmpegBin = Get-ChildItem -Path $extractRoot -Filter 'avcodec-62.dll' -File -Recurse |
+            Select-Object -First 1 -ExpandProperty DirectoryName
+          if (-not $ffmpegBin) {
+            throw 'FFmpeg 8 archive was downloaded, but avcodec-62.dll was not found.'
+          }
+
+          $required = @('avutil-60.dll', 'swresample-6.dll', 'swscale-9.dll', 'avcodec-62.dll', 'avformat-62.dll', 'avfilter-11.dll', 'avdevice-62.dll')
+          foreach ($name in $required) {
+            if (-not (Test-Path (Join-Path $ffmpegBin $name))) {
+              throw "Required FFmpeg 8 native library is missing: $name"
+            }
+          }
+
+          "SPROCKET_FFMPEG8_DIR=$ffmpegBin" >> $env:GITHUB_ENV
+          "SPROCKET_FFMPEG8_REQUIRED=$($required -join ';')" >> $env:GITHUB_ENV
+
+      - name: Publish Windows application
+        shell: pwsh
+        run: |
+          $publishDir = Join-Path $env:GITHUB_WORKSPACE 'artifacts\publish'
+          if (Test-Path $publishDir) {
+            Remove-Item $publishDir -Recurse -Force
+          }
+
+          dotnet publish src/MagmaEdit.App/MagmaEdit.App.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            --no-restore `
+            --output $publishDir
+
+          foreach ($name in ($env:SPROCKET_FFMPEG8_REQUIRED -split ';')) {
+            Copy-Item (Join-Path $env:SPROCKET_FFMPEG8_DIR $name) $publishDir -Force
+          }
+
+          if (-not (Test-Path (Join-Path $publishDir 'MagmaEdit.exe'))) {
+            throw 'The Windows publish output does not contain MagmaEdit.exe.'
+          }
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --version=6.7.1 --yes --no-progress
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          $installerDir = Join-Path $env:GITHUB_WORKSPACE 'artifacts\installer'
+          if (Test-Path $installerDir) {
+            Remove-Item $installerDir -Recurse -Force
+          }
+          New-Item -ItemType Directory -Path $installerDir -Force | Out-Null
+
+          if ($env:GITHUB_REF -like 'refs/tags/v*') {
+            $version = $env:GITHUB_REF_NAME.Substring(1)
+          }
+          else {
+            $version = "0.1.0.${{ github.run_number }}"
+          }
+
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) {
+            throw "Inno Setup compiler was not found at $iscc"
+          }
+
+          & $iscc /DMagmaEditVersion="$version" installer\MagmaEdit.iss
+          if ($LASTEXITCODE -ne 0) {
+            throw "Inno Setup failed with exit code $LASTEXITCODE."
+          }
+
+          $installer = Get-ChildItem $installerDir -Filter '*-Setup.exe' -File | Select-Object -First 1
+          if (-not $installer) {
+            throw 'Windows installer was not created.'
+          }
+
+          Write-Host "Created installer: $($installer.FullName)"
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: MagmaEdit-installer
+          path: artifacts/installer/*-Setup.exe
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $installer = (Get-ChildItem artifacts\installer -Filter '*-Setup.exe' -File | Select-Object -First 1).FullName
+          gh release create $env:GITHUB_REF_NAME $installer --title "MagmaEdit $env:GITHUB_REF_NAME" --generate-notes
