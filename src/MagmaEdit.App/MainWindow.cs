@@ -331,10 +331,10 @@ public sealed class MainWindow : Window
                 }
                 catch (Exception exception) when (
                     exception is FileNotFoundException or
-                    exception is NotSupportedException or
-                    exception is InvalidDataException or
-                    exception is IOException or
-                    exception is UnauthorizedAccessException)
+                    NotSupportedException or
+                    InvalidDataException or
+                    IOException or
+                    UnauthorizedAccessException)
                 {
                     failed++;
                 }
@@ -563,7 +563,6 @@ public sealed class MainWindow : Window
                     string.Equals(asset.Id, clip.MediaId, StringComparison.Ordinal));
                 string mediaName = media?.FileName ?? $"Missing media {clip.MediaId}";
                 string label = $"{mediaName}  |  {clip.TimelineStart.ToSeconds():0.##}s - {clip.TimelineEnd.ToSeconds():0.##}s";
-
                 var clipButton = new Button
                 {
                     Content = label,
