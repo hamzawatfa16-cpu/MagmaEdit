@@ -7,7 +7,7 @@ MagmaEdit updates only from the project's official GitHub Releases endpoint and 
 The updater requires all of the following before installing an update:
 
 - The release tag starts with `v` and matches the version in the expected installer filename.
-- The installer filename is exactly `MagmaEdit-<version>.Setup.exe`.
+- The installer filename is exactly `MagmaEdit-<version>-Setup.exe`.
 - The release and asset uploader are both `github-actions[bot]`.
 - The installer URL uses HTTPS and matches the exact MagmaEdit GitHub release-download path.
 - The declared installer size is positive and within the updater's 250 MiB safety limit.
