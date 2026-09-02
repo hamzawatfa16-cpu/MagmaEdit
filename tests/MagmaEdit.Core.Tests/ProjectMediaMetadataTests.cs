@@ -47,4 +47,37 @@ public sealed class ProjectMediaMetadataTests
             }
         }
     }
+
+    [Fact]
+    public void PublishedStateSurvivesProjectRoundTrip()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"MagmaEdit-project-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+
+        try
+        {
+            WorkspaceLayout workspace = WorkspaceLayout.Create(root);
+            var store = new ProjectStore(workspace);
+            ProjectDocument project = ProjectDocument.Create("Published State Test");
+            MediaAsset asset = MediaAsset.Create(
+                Path.Combine(root, "published.mp4"),
+                Path.Combine(workspace.Media, "published.mp4"));
+            asset.IsPublished = true;
+            project.Media.Add(asset);
+
+            string projectPath = store.GetDefaultPath(project.Name);
+            store.Save(project, projectPath);
+            ProjectDocument loaded = ProjectStore.Load(projectPath);
+
+            MediaAsset loadedAsset = Assert.Single(loaded.Media);
+            Assert.True(loadedAsset.IsPublished);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
 }
