@@ -1,6 +1,6 @@
-# MagmaEdit v0.1.0
+# MagmaEdit v1
 
-This release candidate is built from the green CI tree.
+This is the first direct Windows installer release of MagmaEdit.
 
 ## Included
 
@@ -12,6 +12,10 @@ This release candidate is built from the green CI tree.
 - MP4 export
 - Published / Not Published state
 - Search and gallery sorting
+
+## Installation
+
+Download `MagmaEdit-1.0.0-Setup.exe` from the GitHub Releases page and run it normally. The installed app does not require a terminal.
 
 ## Test focus
 
