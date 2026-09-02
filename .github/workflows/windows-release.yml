@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   package-windows:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[release-v1]')
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -165,7 +164,7 @@ jobs:
           Write-Host "Created installer: $($installer.FullName)"
 
       - name: Publish GitHub release
-        if: github.event_name == 'push' && github.ref_name == 'main'
+        if: github.event_name == 'push' && github.ref_name == 'main' && contains(github.event.head_commit.message, '[release-v1]')
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
