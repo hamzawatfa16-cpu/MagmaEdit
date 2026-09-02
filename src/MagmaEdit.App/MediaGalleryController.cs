@@ -306,6 +306,7 @@ public sealed class MediaGalleryController : IDisposable
         {
             asset.IsPublished = !asset.IsPublished;
             _saveProject();
+            Refresh();
             _setStatus($"{asset.FileName}: {(asset.IsPublished ? "Published" : "Not Published")}");
         };
 
