@@ -13,6 +13,7 @@ internal sealed class UpdateService
     private const string Repository = "MagmaEdit";
     private const string RequiredReleaseAuthor = "github-actions[bot]";
     private const long MaximumInstallerBytes = 250L * 1024 * 1024;
+    private const int MaximumDownloadRedirects = 3;
 
     private static readonly Uri LatestReleaseUri = new($"https://api.github.com/repos/{Owner}/{Repository}/releases/latest");
     private static readonly HttpClient HttpClient = CreateHttpClient();
@@ -53,10 +54,7 @@ internal sealed class UpdateService
 
         try
         {
-            using HttpResponseMessage response = await HttpClient.GetAsync(
-                release.InstallerUri,
-                HttpCompletionOption.ResponseHeadersRead,
-                cancellationToken).ConfigureAwait(false);
+            using HttpResponseMessage response = await GetInstallerResponseAsync(release.InstallerUri, cancellationToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
             if (response.Content.Headers.ContentLength is long declaredSize && declaredSize != release.InstallerSize)
@@ -81,6 +79,44 @@ internal sealed class UpdateService
             throw;
         }
     }
+
+    private static async Task<HttpResponseMessage> GetInstallerResponseAsync(Uri installerUri, CancellationToken cancellationToken)
+    {
+        Uri currentUri = installerUri;
+
+        for (int redirectCount = 0; ; redirectCount++)
+        {
+            ValidateDownloadUri(currentUri, installerUri);
+
+            using HttpRequestMessage request = new(HttpMethod.Get, currentUri);
+            HttpResponseMessage response = await HttpClient.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken).ConfigureAwait(false);
+
+            if (!IsRedirect(response.StatusCode))
+                return response;
+
+            if (redirectCount >= MaximumDownloadRedirects)
+            {
+                response.Dispose();
+                throw new InvalidDataException("The update download followed too many redirects.");
+            }
+
+            Uri? nextUri = response.Headers.Location;
+            response.Dispose();
+            if (nextUri is null)
+                throw new InvalidDataException("The update download returned a redirect without a destination.");
+
+            currentUri = new Uri(currentUri, nextUri);
+        }
+    }
+
+    private static bool IsRedirect(HttpStatusCode statusCode) =>
+        statusCode is HttpStatusCode.MovedPermanently or
+            HttpStatusCode.Found or
+            HttpStatusCode.TemporaryRedirect or
+            HttpStatusCode.PermanentRedirect;
 
     private static async Task DownloadAndVerifyAsync(
         HttpResponseMessage response,
@@ -142,15 +178,21 @@ internal sealed class UpdateService
             throw new InvalidDataException("The MagmaEdit update release provenance could not be trusted.");
         }
 
-        if (release.InstallerUri.Scheme != Uri.UriSchemeHttps ||
-            !IsAllowedDownloadHost(release.InstallerUri.Host))
-        {
-            throw new InvalidDataException("The MagmaEdit update installer URL is not an allowed HTTPS GitHub download.");
-        }
+        ValidateDownloadUri(release.InstallerUri, release.InstallerUri);
 
         string expectedPath = $"/{Owner}/{Repository}/releases/download/{release.TagName}/{release.InstallerName}";
         if (!string.Equals(release.InstallerUri.AbsolutePath, expectedPath, StringComparison.Ordinal))
             throw new InvalidDataException("The MagmaEdit update installer URL does not match its GitHub release.");
+    }
+
+    private static void ValidateDownloadUri(Uri uri, Uri originalInstallerUri)
+    {
+        if (uri.Scheme != Uri.UriSchemeHttps || !IsAllowedDownloadHost(uri.Host))
+            throw new InvalidDataException("The MagmaEdit update installer URL is not an allowed HTTPS GitHub download.");
+
+        if (uri.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase) &&
+            !uri.Host.Equals(originalInstallerUri.Host, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("The MagmaEdit update redirect returned to an unexpected GitHub host.");
     }
 
     private static bool IsAllowedDownloadHost(string host) =>
@@ -162,7 +204,7 @@ internal sealed class UpdateService
     {
         var handler = new SocketsHttpHandler
         {
-            AllowAutoRedirect = true,
+            AllowAutoRedirect = false,
             AutomaticDecompression = DecompressionMethods.All
         };
 
