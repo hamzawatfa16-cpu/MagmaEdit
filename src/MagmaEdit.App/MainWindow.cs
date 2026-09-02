@@ -23,8 +23,9 @@ public sealed class MainWindow : Window
 
     private readonly WorkspaceLayout _workspace;
     private readonly ProjectStore _projectStore;
-    private readonly ProjectDocument _project;
-    private readonly string _projectPath;
+    private readonly ProjectSession _projectSession;
+    private ProjectDocument _project;
+    private string _projectPath;
     private readonly StackPanel _mediaList;
     private readonly StackPanel _timelineList;
     private readonly TextBlock _statusText;
@@ -34,6 +35,7 @@ public sealed class MainWindow : Window
     private readonly EditHistory _history = new();
     private Button? _undoButton;
     private Button? _redoButton;
+    private Button? _saveProjectButton;
     private Button? _addToTimelineButton;
     private Button? _removeClipButton;
     private Button? _splitClipButton;
@@ -60,8 +62,8 @@ public sealed class MainWindow : Window
         _workspace = WorkspaceLayout.ForCurrentUser();
         new WorkspaceManager(_workspace).EnsureCreated();
         _projectStore = new ProjectStore(_workspace);
-        _projectPath = _projectStore.GetDefaultPath(DefaultProjectName);
-        _project = LoadOrCreateProject();
+        _projectSession = new ProjectSession(_workspace);
+        (_project, _projectPath) = LoadOrCreateProject();
 
         _mediaList = new StackPanel { Spacing = 6 };
         _timelineList = new StackPanel { Spacing = 8 };
@@ -127,16 +129,25 @@ public sealed class MainWindow : Window
             return false;
         }
 
-        return _project.Media.Remove(asset);
+        bool removed = _project.Media.Remove(asset);
+        if (removed)
+        {
+            SaveProject();
+            _mediaGallery?.Refresh();
+        }
+
+        return removed;
     }
 
-    private ProjectDocument LoadOrCreateProject()
+    private (ProjectDocument Project, string Path) LoadOrCreateProject()
     {
-        if (File.Exists(_projectPath))
+        string defaultPath = _projectStore.GetDefaultPath(DefaultProjectName);
+        if (File.Exists(defaultPath))
         {
             try
             {
-                return ProjectStore.Load(_projectPath);
+                ProjectDocument project = _projectSession.Open(defaultPath);
+                return (project, defaultPath);
             }
             catch (InvalidDataException)
             {
@@ -146,19 +157,29 @@ public sealed class MainWindow : Window
             {
                 return CreateRecoveryProject();
             }
+            catch (NotSupportedException)
+            {
+                return CreateRecoveryProject();
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return CreateRecoveryProject();
+            }
         }
 
-        ProjectDocument project = ProjectDocument.Create(DefaultProjectName);
-        _projectStore.Save(project, _projectPath);
-        return project;
+        ProjectDocument projectToCreate = ProjectDocument.Create(DefaultProjectName);
+        _projectStore.Save(projectToCreate, defaultPath);
+        ProjectDocument project = _projectSession.Open(defaultPath);
+        return (project, defaultPath);
     }
 
-    private ProjectDocument CreateRecoveryProject()
+    private (ProjectDocument Project, string Path) CreateRecoveryProject()
     {
-        string recoveryPath = Path.Combine(_workspace.Projects, $"{DefaultProjectName} - Recovery.magmaedit.json");
+        string recoveryPath = _projectStore.GetUniqueProjectPath($"{DefaultProjectName} - Recovery");
         ProjectDocument recovery = ProjectDocument.Create($"{DefaultProjectName} - Recovery");
         _projectStore.Save(recovery, recoveryPath);
-        return recovery;
+        ProjectDocument openedRecovery = _projectSession.Open(recoveryPath);
+        return (openedRecovery, recoveryPath);
     }
 
     private void EnsureTimelineTrack()
@@ -198,6 +219,18 @@ public sealed class MainWindow : Window
                 }
             }
         };
+
+        var newProjectButton = new Button { Content = "New Project" };
+        newProjectButton.Click += NewProjectButton_Click;
+        header.Children.Add(newProjectButton);
+
+        var openProjectButton = new Button { Content = "Open Project" };
+        openProjectButton.Click += OpenProjectButton_Click;
+        header.Children.Add(openProjectButton);
+
+        _saveProjectButton = new Button { Content = "Save Project" };
+        _saveProjectButton.Click += (_, _) => SaveProjectWithStatus();
+        header.Children.Add(_saveProjectButton);
 
         _undoButton = new Button { Content = "Undo" };
         _undoButton.Click += (_, _) => Undo();
@@ -370,6 +403,150 @@ public sealed class MainWindow : Window
         root.Children.Add(timeline);
 
         return root;
+    }
+
+    private async void NewProjectButton_Click(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            string? name = await ProjectNameDialog.ShowAsync(this, "Untitled Project");
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return;
+            }
+
+            ProjectDocument project = _projectSession.CreateNew(name);
+            ActivateProject(project, _projectSession.CurrentPath!);
+            _statusText.Text = $"Created project: {_project.Name}";
+        }
+        catch (ArgumentException exception)
+        {
+            _statusText.Text = $"Could not create project: {exception.Message}";
+        }
+        catch (IOException exception)
+        {
+            _statusText.Text = $"Could not create project: {exception.Message}";
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            _statusText.Text = $"Could not create project: {exception.Message}";
+        }
+    }
+
+    private async void OpenProjectButton_Click(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (!StorageProvider.CanOpen)
+            {
+                _statusText.Text = "File selection is not available on this system.";
+                return;
+            }
+
+            IReadOnlyList<IStorageFile> files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "Open MagmaEdit Project",
+                AllowMultiple = false,
+                FileTypeFilter =
+                [
+                    new FilePickerFileType("MagmaEdit Projects")
+                    {
+                        Patterns = ["*.magmaedit.json"]
+                    }
+                ]
+            });
+
+            if (files.Count == 0)
+            {
+                return;
+            }
+
+            string? selectedPath = files[0].TryGetLocalPath();
+            if (string.IsNullOrWhiteSpace(selectedPath))
+            {
+                _statusText.Text = "The selected project is not available as a local file.";
+                return;
+            }
+
+            string fullPath = Path.GetFullPath(selectedPath);
+            ProjectDocument project = _projectSession.Open(fullPath);
+            ActivateProject(project, fullPath);
+            _statusText.Text = $"Opened project: {_project.Name}";
+        }
+        catch (InvalidDataException exception)
+        {
+            _statusText.Text = $"Could not open project: {exception.Message}";
+        }
+        catch (JsonException exception)
+        {
+            _statusText.Text = $"Could not open project: {exception.Message}";
+        }
+        catch (NotSupportedException exception)
+        {
+            _statusText.Text = $"Could not open project: {exception.Message}";
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            _statusText.Text = $"Could not open project: {exception.Message}";
+        }
+        catch (IOException exception)
+        {
+            _statusText.Text = $"Could not open project: {exception.Message}";
+        }
+    }
+
+    private void SaveProjectWithStatus()
+    {
+        try
+        {
+            SaveProject();
+            _statusText.Text = $"Saved project: {_project.Name}";
+        }
+        catch (IOException exception)
+        {
+            _statusText.Text = $"Could not save project: {exception.Message}";
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            _statusText.Text = $"Could not save project: {exception.Message}";
+        }
+        catch (InvalidDataException exception)
+        {
+            _statusText.Text = $"Could not save project: {exception.Message}";
+        }
+    }
+
+    private void ActivateProject(ProjectDocument project, string path)
+    {
+        ArgumentNullException.ThrowIfNull(project);
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        _previewGeneration++;
+        _previewBitmap?.Dispose();
+        _previewBitmap = null;
+        _selectedMedia = null;
+        _selectedClip = null;
+        _history.Clear();
+
+        _project = project;
+        _projectPath = Path.GetFullPath(path);
+        _selectedTrack = _project.Timeline.Tracks.FirstOrDefault();
+        EnsureTimelineTrack();
+
+        _statusText.Text = $"Project: {_project.Name}";
+        _previewText.IsVisible = true;
+        _previewText.Text = "No video selected";
+        if (_previewText.Parent is Border previewCanvas)
+        {
+            previewCanvas.Background = Brushes.Black;
+        }
+        _inspectorText.Text = "Select a media item to inspect it.";
+        LoadMediaItems(refreshGallery: false);
+        RefreshTimeline();
+        _mediaGallery?.Refresh();
+        UpdateHistoryButtons();
+        UpdateClipActionButtons();
+        UpdateWindowTitle();
     }
 
     private async void ImportButton_Click(object? sender, RoutedEventArgs e)
@@ -751,22 +928,22 @@ public sealed class MainWindow : Window
         }
     }
 
-    private void LoadMediaItems()
+    private void LoadMediaItems(bool refreshGallery = true)
     {
+        _mediaList.Children.Clear();
         foreach (MediaAsset asset in _project.Media)
         {
             AddMediaItem(asset);
+        }
+
+        if (refreshGallery)
+        {
+            _mediaGallery?.Refresh();
         }
     }
 
     private void AddMediaItem(MediaAsset asset)
     {
-        if (_mediaGallery is not null)
-        {
-            _mediaGallery.Refresh();
-            return;
-        }
-
         var item = new Button
         {
             Content = asset.FileName,
@@ -960,8 +1137,14 @@ public sealed class MainWindow : Window
     private void SaveProject()
     {
         _project.ModifiedUtc = DateTimeOffset.UtcNow;
-        _projectStore.Save(_project, _projectPath);
+        _projectSession.Save();
+        UpdateWindowTitle();
         RefreshTimeline();
+    }
+
+    private void UpdateWindowTitle()
+    {
+        Title = $"{_project.Name} — MagmaEdit";
     }
 
     private static string BuildImportStatus(int imported, int alreadyImported, int failed)
