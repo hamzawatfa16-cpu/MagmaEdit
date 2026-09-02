@@ -148,6 +148,25 @@ jobs:
             throw 'The Windows publish output does not contain ffmpeg.exe.'
           }
 
+      - name: Smoke test published application startup
+        shell: pwsh
+        run: |
+          $publishDir = Join-Path $env:GITHUB_WORKSPACE 'artifacts\publish'
+          $exe = Join-Path $publishDir 'MagmaEdit.exe'
+          $process = $null
+          try {
+            $process = Start-Process -FilePath $exe -WorkingDirectory $publishDir -PassThru
+            Start-Sleep -Seconds 8
+            if ($process.HasExited) {
+              throw "MagmaEdit exited during startup smoke test with exit code $($process.ExitCode)."
+            }
+          }
+          finally {
+            if ($process -and -not $process.HasExited) {
+              Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            }
+          }
+
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --version=6.7.1 --yes --no-progress
@@ -177,6 +196,45 @@ jobs:
           }
 
           Write-Host "Created installer: $($installer.FullName)"
+
+      - name: Smoke test installed application startup
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem (Join-Path $env:GITHUB_WORKSPACE 'artifacts\installer') -Filter '*-Setup.exe' -File | Select-Object -First 1
+          $installDir = Join-Path $env:RUNNER_TEMP 'MagmaEdit-SmokeInstall'
+          if (Test-Path $installDir) {
+            Remove-Item $installDir -Recurse -Force
+          }
+          New-Item -ItemType Directory -Path $installDir -Force | Out-Null
+
+          $installerProcess = Start-Process -FilePath $installer.FullName -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$installDir" -Wait -PassThru
+          if ($installerProcess.ExitCode -ne 0) {
+            throw "The MagmaEdit installer exited with code $($installerProcess.ExitCode)."
+          }
+
+          $installedExe = Join-Path $installDir 'MagmaEdit.exe'
+          if (-not (Test-Path $installedExe)) {
+            throw "The installer completed but $installedExe was not created."
+          }
+
+          $appProcess = $null
+          try {
+            $appProcess = Start-Process -FilePath $installedExe -WorkingDirectory $installDir -PassThru
+            Start-Sleep -Seconds 8
+            if ($appProcess.HasExited) {
+              throw "Installed MagmaEdit exited during startup smoke test with exit code $($appProcess.ExitCode)."
+            }
+          }
+          finally {
+            if ($appProcess -and -not $appProcess.HasExited) {
+              Stop-Process -Id $appProcess.Id -Force -ErrorAction SilentlyContinue
+            }
+          }
+
+          $uninstaller = Join-Path $installDir 'unins000.exe'
+          if (Test-Path $uninstaller) {
+            & $uninstaller /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
+          }
 
       - name: Publish GitHub release
         if: github.event_name == 'push' && github.ref_name == 'main' && contains(github.event.head_commit.message, '[release-v1]')
