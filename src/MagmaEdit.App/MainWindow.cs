@@ -735,7 +735,7 @@ public sealed class MainWindow : Window
         ShowPreviewLoadingState(asset);
         if (_addToTimelineButton is not null)
         {
-            _addToTimelineButton.IsEnabled = asset.Metadata is { } metadata && metadata.Duration > TimeSpan.Zero;
+            _addToTimelineButton.IsEnabled = asset.Metadata is { } selectedMetadata && selectedMetadata.Duration > TimeSpan.Zero;
         }
         UpdateClipActionButtons();
 
