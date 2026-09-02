@@ -35,8 +35,8 @@ jobs:
         shell: pwsh
         run: |
           if ($env:GITHUB_EVENT_NAME -eq 'push' -and $env:GITHUB_REF_NAME -eq 'main') {
-            $version = '1.0.2'
-            $releaseTag = 'v1.0.2'
+            $version = '1.0.3'
+            $releaseTag = 'v1.0.3'
           }
           else {
             $version = "0.1.0.${{ github.run_number }}"
