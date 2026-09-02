@@ -79,32 +79,51 @@ public sealed class ProjectStore
 
     private static ProjectDocument? DeserializeAndMigrate(string json)
     {
-        using JsonDocument document = JsonDocument.Parse(json);
-        int schemaVersion = document.RootElement.TryGetProperty("schemaVersion", out JsonElement value)
-            ? value.GetInt32()
-            : 1;
-
-        ProjectDocument? project = JsonSerializer.Deserialize<ProjectDocument>(json, JsonOptions);
-        if (project is null)
+        try
         {
-            return null;
-        }
+            using JsonDocument document = JsonDocument.Parse(json);
+            int schemaVersion = document.RootElement.TryGetProperty("schemaVersion", out JsonElement value)
+                ? value.GetInt32()
+                : 1;
 
-        return schemaVersion switch
-        {
-            1 => new ProjectDocument
+            ProjectDocument? project = JsonSerializer.Deserialize<ProjectDocument>(json, JsonOptions);
+            if (project is null)
             {
-                Id = project.Id,
-                Name = project.Name,
-                SchemaVersion = ProjectDocument.CurrentSchemaVersion,
-                CreatedUtc = project.CreatedUtc,
-                ModifiedUtc = project.ModifiedUtc,
-                Media = project.Media,
-                Timeline = TimelineDocument.CreateDefault()
-            },
-            ProjectDocument.CurrentSchemaVersion => project,
-            _ => throw new InvalidDataException($"Unsupported project schema version: {schemaVersion}.")
-        };
+                return null;
+            }
+
+            return schemaVersion switch
+            {
+                1 => new ProjectDocument
+                {
+                    Id = project.Id,
+                    Name = project.Name,
+                    SchemaVersion = ProjectDocument.CurrentSchemaVersion,
+                    CreatedUtc = project.CreatedUtc,
+                    ModifiedUtc = project.ModifiedUtc,
+                    Media = project.Media,
+                    Timeline = TimelineDocument.CreateDefault()
+                },
+                ProjectDocument.CurrentSchemaVersion => project,
+                _ => throw new InvalidDataException($"Unsupported project schema version: {schemaVersion}.")
+            };
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidDataException("The project file contains invalid JSON.", exception);
+        }
+        catch (InvalidOperationException exception)
+        {
+            throw new InvalidDataException("The project file contains an invalid JSON value shape.", exception);
+        }
+        catch (FormatException exception)
+        {
+            throw new InvalidDataException("The project file contains a malformed value.", exception);
+        }
+        catch (OverflowException exception)
+        {
+            throw new InvalidDataException("The project file contains an out-of-range value.", exception);
+        }
     }
 
     private static void Validate(ProjectDocument project)
