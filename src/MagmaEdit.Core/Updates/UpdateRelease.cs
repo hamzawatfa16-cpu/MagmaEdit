@@ -32,7 +32,7 @@ public sealed record UpdateRelease(
             if (draft || prerelease)
                 throw new InvalidDataException("The GitHub release is not a stable published release.");
 
-            if (!tagName.StartsWith("v", StringComparison.Ordinal))
+            if (!tagName.StartsWith('v'))
                 throw new InvalidDataException("The GitHub release tag is invalid.");
 
             string versionText = tagName[1..];
