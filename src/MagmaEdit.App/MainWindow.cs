@@ -107,6 +107,10 @@ public sealed class MainWindow : Window
         _mediaGallery.Refresh();
     }
 
+    internal ProjectDocument GetProjectForExport() => _project;
+
+    internal void SaveProjectForExport() => SaveProject();
+
     private ProjectDocument LoadOrCreateProject()
     {
         if (File.Exists(_projectPath))
