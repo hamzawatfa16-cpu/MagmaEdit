@@ -56,7 +56,7 @@ internal sealed class UpdateController
             _button.Content = "Restarting…";
 
             await Task.Delay(TimeSpan.FromMilliseconds(500)).ConfigureAwait(true);
-            if (Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+            if (Avalonia.Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
             {
                 desktop.Shutdown();
             }
