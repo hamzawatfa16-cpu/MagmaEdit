@@ -62,7 +62,6 @@ internal sealed class ProjectNameDialog : Window
     {
         ArgumentNullException.ThrowIfNull(owner);
         ProjectNameDialog dialog = new(initialName);
-        _ = dialog.Show();
         return await dialog.ShowDialog<string?>(owner);
     }
 }
