@@ -5,7 +5,7 @@ using MagmaEdit.Core.Projects;
 
 namespace MagmaEdit.Core.Export;
 
-/// <summary>Exports the supported MagmaEdit timeline to a real 1080×1920 H.264 MP4.</summary>
+/// <summary>Exports the supported MagmaEdit timeline to a real 1080×1920 H.264/AAC MP4.</summary>
 public sealed class VideoExportService
 {
     private readonly string? _explicitFfmpegPath;
@@ -59,7 +59,7 @@ public sealed class VideoExportService
 
             progress?.Report(0d);
             Task<string> errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
-            _ = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            Task<string> outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
 
             try
             {
@@ -71,6 +71,7 @@ public sealed class VideoExportService
                 throw;
             }
 
+            await outputTask.ConfigureAwait(false);
             string error = await errorTask.ConfigureAwait(false);
             if (process.ExitCode != 0)
             {
@@ -94,7 +95,7 @@ public sealed class VideoExportService
         }
     }
 
-    private IReadOnlyList<VideoExportSegment> BuildSegments(ProjectDocument project)
+    private static IReadOnlyList<VideoExportSegment> BuildSegments(ProjectDocument project)
     {
         TimelineTrack[] tracks = project.Timeline.Tracks.Where(track => track.Clips.Count > 0).ToArray();
         if (tracks.Length == 0)
@@ -130,7 +131,7 @@ public sealed class VideoExportService
                     $"Clip '{clip.Id}' uses source time beyond the media duration.");
             }
 
-            segments.Add(new VideoExportSegment(media.LibraryPath, clip.SourceIn, clip.Duration));
+            segments.Add(new VideoExportSegment(media.LibraryPath, clip.SourceIn, clip.Duration, metadata.HasAudio));
             expectedStart = clip.TimelineEnd;
         }
 
