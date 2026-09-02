@@ -169,10 +169,9 @@ public sealed class SplitTimelineClipCommand : IEditCommand
             return;
         }
 
-        _editor.RemoveClip(_trackId, _leftClip!.Id);
-        _editor.RemoveClip(_trackId, _rightClip!.Id);
-        _editor.InsertExistingClip(_trackId, _leftClip.Clone(), _index);
-        _editor.InsertExistingClip(_trackId, _rightClip.Clone(), _index + 1);
+        _editor.RemoveClip(_trackId, _originalClip.Id);
+        _editor.InsertExistingClip(_trackId, _leftClip!.Clone(), _index);
+        _editor.InsertExistingClip(_trackId, _rightClip!.Clone(), _index + 1);
     }
 
     public void Revert()
