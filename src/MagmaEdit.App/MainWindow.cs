@@ -588,11 +588,28 @@ public sealed class MainWindow : Window
             return;
         }
 
-        EditTime sourceIn = EditTime.FromSeconds(sourceInSeconds);
-        EditTime sourceOut = EditTime.FromSeconds(sourceOutSeconds);
-        if (sourceIn < EditTime.Zero || sourceOut <= sourceIn)
+        if (!double.IsFinite(sourceInSeconds) || !double.IsFinite(sourceOutSeconds) ||
+            sourceInSeconds < 0 || sourceOutSeconds < 0 || sourceOutSeconds <= sourceInSeconds)
         {
-            _statusText.Text = "Source Out must be greater than Source In, and both must be non-negative.";
+            _statusText.Text = "Source Out must be greater than Source In, and both must be finite and non-negative.";
+            return;
+        }
+
+        EditTime sourceIn;
+        EditTime sourceOut;
+        try
+        {
+            sourceIn = EditTime.FromSeconds(sourceInSeconds);
+            sourceOut = EditTime.FromSeconds(sourceOutSeconds);
+        }
+        catch (ArgumentOutOfRangeException exception)
+        {
+            _statusText.Text = $"Enter a trim range within the supported time limit: {exception.Message}";
+            return;
+        }
+        catch (OverflowException exception)
+        {
+            _statusText.Text = $"Enter a trim range within the supported time limit: {exception.Message}";
             return;
         }
 
