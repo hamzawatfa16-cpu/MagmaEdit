@@ -20,3 +20,5 @@ Download `MagmaEdit-1.0.0-Setup.exe` from the GitHub Releases page and run it no
 ## Test focus
 
 Please test installation, launching without a terminal, importing 9:16 videos, preview, timeline editing, undo/redo, export, and gallery removal behavior.
+
+The v1 release is built directly by GitHub Actions and publishes the installer as a GitHub Release asset.
