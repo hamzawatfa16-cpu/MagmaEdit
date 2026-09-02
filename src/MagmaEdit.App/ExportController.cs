@@ -6,15 +6,17 @@ using MagmaEdit.Core.Workspace;
 
 namespace MagmaEdit.App;
 
-/// <summary>Adds a real one-click export action to the existing window without duplicating project state.</summary>
+/// <summary>Adds a real one-click export action to the existing window using the live project state.</summary>
 internal sealed class ExportController
 {
     private readonly WorkspaceLayout _workspace = WorkspaceLayout.ForCurrentUser();
+    private readonly MainWindow _window;
     private readonly Button _button;
     private bool _exporting;
 
-    private ExportController(Button button)
+    private ExportController(MainWindow window, Button button)
     {
+        _window = window;
         _button = button;
         _button.Click += ExportButton_Click;
     }
@@ -31,7 +33,7 @@ internal sealed class ExportController
             Content = "Export MP4"
         };
         header.Children.Add(button);
-        return new ExportController(button);
+        return new ExportController(window, button);
     }
 
     private async void ExportButton_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -46,9 +48,8 @@ internal sealed class ExportController
         try
         {
             new WorkspaceManager(_workspace).EnsureCreated();
-            ProjectStore store = new(_workspace);
-            string projectPath = store.GetDefaultPath("Untitled Project");
-            ProjectDocument project = ProjectStore.Load(projectPath);
+            ProjectDocument project = _window.GetProjectForExport();
+            _window.SaveProjectForExport();
 
             string fileName = BuildExportFileName(project.Name);
             string outputPath = Path.Combine(_workspace.Exports, fileName);
