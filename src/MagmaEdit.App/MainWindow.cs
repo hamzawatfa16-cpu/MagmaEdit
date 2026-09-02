@@ -111,6 +111,25 @@ public sealed class MainWindow : Window
 
     internal void SaveProjectForExport() => SaveProject();
 
+    internal IReadOnlyList<MediaAsset> GetMediaAssetsForGallery() => _project.Media;
+
+    internal void SetStatusForGallery(string message) => _statusText.Text = message;
+
+    internal bool RemoveMediaFromGallery(MediaAsset asset)
+    {
+        ArgumentNullException.ThrowIfNull(asset);
+
+        bool inUse = _project.Timeline.Tracks.Any(track =>
+            track.Clips.Any(clip => string.Equals(clip.MediaId, asset.Id, StringComparison.Ordinal)));
+        if (inUse)
+        {
+            _statusText.Text = $"Cannot remove {asset.FileName}: it is used by the timeline.";
+            return false;
+        }
+
+        return _project.Media.Remove(asset);
+    }
+
     private ProjectDocument LoadOrCreateProject()
     {
         if (File.Exists(_projectPath))
