@@ -16,11 +16,6 @@ csharp_style_var_elsewhere = false:suggestion
 dotnet_sort_system_directives_first = true
 dotnet_separate_import_directive_groups = false
 
-# Avalonia 12.1.1 currently reports TextBox.Watermark as an obsolete compiler warning.
-# Keep this narrowly scoped to the existing MainWindow until its two legacy property uses are replaced.
-[src/MagmaEdit.App/MainWindow.cs]
-dotnet_diagnostic.CS0618.severity = silent
-
 [*.{json,yml,yaml}]
 indent_size = 2
 
