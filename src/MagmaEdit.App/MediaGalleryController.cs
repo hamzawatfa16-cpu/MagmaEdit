@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
@@ -7,7 +6,6 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using MagmaEdit.Core.Media;
-using MagmaEdit.Core.Projects;
 
 namespace MagmaEdit.App;
 
@@ -95,53 +93,18 @@ public sealed class MediaGalleryController : IDisposable
     public static MediaGalleryController Attach(Window window)
     {
         ArgumentNullException.ThrowIfNull(window);
-        if (window.GetType() != typeof(MainWindow))
+        if (window is not MainWindow mainWindow)
         {
             throw new InvalidOperationException("The automatic gallery attachment requires MagmaEdit.MainWindow.");
         }
 
-        Type type = typeof(MainWindow);
-        FieldInfo projectField = type.GetField("_project", BindingFlags.Instance | BindingFlags.NonPublic)
-            ?? throw new InvalidOperationException("MainWindow project field was not found.");
-        FieldInfo statusField = type.GetField("_statusText", BindingFlags.Instance | BindingFlags.NonPublic)
-            ?? throw new InvalidOperationException("MainWindow status field was not found.");
-        MethodInfo selectMethod = type.GetMethod("SelectMedia", BindingFlags.Instance | BindingFlags.NonPublic)
-            ?? throw new InvalidOperationException("MainWindow media-selection method was not found.");
-        MethodInfo saveMethod = type.GetMethod("SaveProject", BindingFlags.Instance | BindingFlags.NonPublic)
-            ?? throw new InvalidOperationException("MainWindow project-save method was not found.");
-
-        if (projectField.GetValue(window) is not ProjectDocument project ||
-            statusField.GetValue(window) is not TextBlock statusText)
-        {
-            throw new InvalidOperationException("MainWindow gallery state could not be accessed.");
-        }
-
-        MediaGalleryController? controller = null;
-        Action saveAndRefresh = () =>
-        {
-            saveMethod.Invoke(window, null);
-            controller?.Refresh();
-        };
-
-        controller = CreateForWindow(
-            window,
-            () => project.Media,
-            asset => selectMethod.Invoke(window, new object[] { asset }),
-            saveAndRefresh,
-            asset =>
-            {
-                bool inUse = project.Timeline.Tracks.Any(track =>
-                    track.Clips.Any(clip => string.Equals(clip.MediaId, asset.Id, StringComparison.Ordinal)));
-                if (inUse)
-                {
-                    statusText.Text = $"Cannot remove {asset.FileName}: it is used by the timeline.";
-                    return false;
-                }
-
-                return project.Media.Remove(asset);
-            },
-            message => statusText.Text = message);
-        return controller;
+        return Attach(
+            mainWindow,
+            mainWindow.GetMediaAssetsForGallery,
+            mainWindow.SelectMedia,
+            mainWindow.SaveProjectForExport,
+            mainWindow.RemoveMediaFromGallery,
+            mainWindow.SetStatusForGallery);
     }
 
     private static MediaGalleryController CreateForWindow(
@@ -371,6 +334,12 @@ public sealed class MediaGalleryController : IDisposable
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
                 if (_disposed)
+                {
+                    bitmap.Dispose();
+                    return;
+                }
+
+                if (!_getAssets().Contains(asset))
                 {
                     bitmap.Dispose();
                     return;
