@@ -85,8 +85,6 @@ jobs:
             throw 'FFmpeg 8 archive was downloaded, but avcodec-62.dll was not found.'
           }
 
-          # These are the FFmpeg 8 DLLs used by the Sprocket media stack on Windows.
-          # postproc is not shipped in the selected BtbN shared archive and is optional in FFmpegLoader.
           $required = @('avutil-60.dll', 'swresample-6.dll', 'swscale-9.dll', 'avcodec-62.dll', 'avformat-62.dll', 'avfilter-11.dll', 'avdevice-62.dll')
           foreach ($name in $required) {
             if (-not (Test-Path (Join-Path $ffmpegBin $name))) {
@@ -95,7 +93,72 @@ jobs:
           }
 
           "SPROCKET_FFMPEG8_DIR=$ffmpegBin" >> $env:GITHUB_ENV
+          "SPROCKET_FFMPEG8_REQUIRED=$($required -join ';')" >> $env:GITHUB_ENV
           Write-Host "Using FFmpeg 8 natives from $ffmpegBin"
 
       - name: Test
         run: dotnet test MagmaEdit.slnx --configuration Release --no-build --verbosity normal
+
+      - name: Publish Windows application
+        shell: pwsh
+        run: |
+          $publishDir = Join-Path $env:GITHUB_WORKSPACE 'artifacts\publish'
+          if (Test-Path $publishDir) {
+            Remove-Item $publishDir -Recurse -Force
+          }
+
+          dotnet publish src/MagmaEdit.App/MagmaEdit.App.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            --no-restore `
+            --output $publishDir
+
+          foreach ($name in ($env:SPROCKET_FFMPEG8_REQUIRED -split ';')) {
+            Copy-Item (Join-Path $env:SPROCKET_FFMPEG8_DIR $name) $publishDir -Force
+          }
+
+          if (-not (Test-Path (Join-Path $publishDir 'MagmaEdit.exe'))) {
+            throw 'The Windows publish output does not contain MagmaEdit.exe.'
+          }
+
+          Write-Host "Published MagmaEdit to $publishDir"
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --version=6.7.1 --yes --no-progress
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          $installerDir = Join-Path $env:GITHUB_WORKSPACE 'artifacts\installer'
+          if (Test-Path $installerDir) {
+            Remove-Item $installerDir -Recurse -Force
+          }
+          New-Item -ItemType Directory -Path $installerDir -Force | Out-Null
+
+          $version = "0.1.0.${{ github.run_number }}"
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) {
+            throw "Inno Setup compiler was not found at $iscc"
+          }
+
+          & $iscc /DMagmaEditVersion="$version" installer\MagmaEdit.iss
+          if ($LASTEXITCODE -ne 0) {
+            throw "Inno Setup failed with exit code $LASTEXITCODE."
+          }
+
+          $installer = Join-Path $installerDir "MagmaEdit-$version-Setup.exe"
+          if (-not (Test-Path $installer)) {
+            throw "Installer was not created at $installer"
+          }
+
+          Get-Item $installer | Format-List FullName,Length
+
+      - name: Upload Windows installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MagmaEdit-installer
+          path: artifacts/installer/MagmaEdit-*-Setup.exe
+          if-no-files-found: error
+          retention-days: 14
