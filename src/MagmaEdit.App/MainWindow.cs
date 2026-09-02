@@ -33,6 +33,7 @@ public sealed class MainWindow : Window
     private readonly EditHistory _history = new();
     private Button? _undoButton;
     private Button? _redoButton;
+    private Button? _addToTimelineButton;
     private Bitmap? _previewBitmap;
     private int _previewGeneration;
     private MediaGalleryController? _mediaGallery;
@@ -230,6 +231,14 @@ public sealed class MainWindow : Window
         Grid.SetColumn(preview, 1);
         root.Children.Add(preview);
 
+        _addToTimelineButton = new Button
+        {
+            Content = "Add Selected Video to Timeline",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            IsEnabled = false
+        };
+        _addToTimelineButton.Click += (_, _) => AddSelectedMediaToTimeline();
+
         var inspector = new Border
         {
             Padding = new Thickness(12),
@@ -239,7 +248,8 @@ public sealed class MainWindow : Window
                 Children =
                 {
                     new TextBlock { Text = "Inspector", FontSize = 18, FontWeight = FontWeight.SemiBold },
-                    _inspectorText
+                    _inspectorText,
+                    _addToTimelineButton
                 }
             }
         };
@@ -372,6 +382,50 @@ public sealed class MainWindow : Window
         UpdateHistoryButtons();
     }
 
+    private void AddSelectedMediaToTimeline()
+    {
+        MediaAsset? asset = _selectedMedia;
+        TimelineTrack? track = _selectedTrack;
+        if (asset is null || track is null)
+        {
+            _statusText.Text = "Select a video and a timeline track first.";
+            return;
+        }
+
+        if (asset.Metadata is not { } metadata || metadata.Duration <= TimeSpan.Zero)
+        {
+            _statusText.Text = $"Cannot add {asset.FileName}: its duration is unavailable.";
+            return;
+        }
+
+        EditTime duration = EditTime.FromSeconds(metadata.Duration.TotalSeconds);
+        EditTime timelineStart = track.Clips.Count == 0
+            ? EditTime.Zero
+            : track.Clips.Max(clip => clip.TimelineEnd);
+
+        var command = new InsertTimelineClipCommand(
+            new TimelineEditor(_project.Timeline),
+            track.Id,
+            asset.Id,
+            timelineStart,
+            EditTime.Zero,
+            duration);
+
+        try
+        {
+            _history.Execute(command);
+        }
+        catch (InvalidOperationException exception)
+        {
+            _statusText.Text = $"Could not add {asset.FileName}: {exception.Message}";
+            return;
+        }
+
+        SaveProject();
+        _statusText.Text = $"Added {asset.FileName} to {track.Name}.";
+        UpdateHistoryButtons();
+    }
+
     private void Undo()
     {
         if (!_history.Undo())
@@ -449,6 +503,10 @@ public sealed class MainWindow : Window
         _selectedMedia = asset;
         int generation = ++_previewGeneration;
         ShowPreviewLoadingState(asset);
+        if (_addToTimelineButton is not null)
+        {
+            _addToTimelineButton.IsEnabled = asset.Metadata is { Duration: > TimeSpan.Zero };
+        }
 
         if (asset.Metadata is { } metadata)
         {
