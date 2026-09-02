@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using MagmaEdit.Core.Editing;
 using MagmaEdit.Core.Media;
@@ -30,6 +31,12 @@ public sealed class ProjectStore
         return Path.Combine(_workspace.Projects, $"{SanitizeFileName(projectName)}.magmaedit.json");
     }
 
+    public static string GetBackupPath(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        return $"{Path.GetFullPath(path)}.bak";
+    }
+
     public void Save(ProjectDocument project, string? path = null)
     {
         ArgumentNullException.ThrowIfNull(project);
@@ -40,11 +47,32 @@ public sealed class ProjectStore
 
         project.ModifiedUtc = DateTimeOffset.UtcNow;
         string temporary = $"{destination}.{Guid.NewGuid():N}.tmp";
+        string backup = GetBackupPath(destination);
 
         try
         {
+            if (File.Exists(destination))
+            {
+                File.Copy(destination, backup, overwrite: true);
+            }
+
             string json = JsonSerializer.Serialize(project, JsonOptions);
-            File.WriteAllText(temporary, json);
+            byte[] payload = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false).GetBytes(json);
+            using (FileStream stream = new(
+                temporary,
+                new FileStreamOptions
+                {
+                    Mode = FileMode.CreateNew,
+                    Access = FileAccess.Write,
+                    Share = FileShare.None,
+                    Options = FileOptions.WriteThrough | FileOptions.SequentialScan,
+                    BufferSize = 64 * 1024
+                }))
+            {
+                stream.Write(payload);
+                stream.Flush(flushToDisk: true);
+            }
+
             File.Move(temporary, destination, overwrite: true);
         }
         finally
