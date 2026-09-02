@@ -90,4 +90,18 @@ public sealed class TimelineTests
         Assert.Single(first.Clips);
         Assert.Single(second.Clips);
     }
+
+    [Fact]
+    public void FromSecondsRejectsNegativeSeconds()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => EditTime.FromSeconds(-1));
+    }
+
+    [Fact]
+    public void FromSecondsRejectsNonFiniteSeconds()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => EditTime.FromSeconds(double.NaN));
+        Assert.Throws<ArgumentOutOfRangeException>(() => EditTime.FromSeconds(double.PositiveInfinity));
+        Assert.Throws<ArgumentOutOfRangeException>(() => EditTime.FromSeconds(double.NegativeInfinity));
+    }
 }

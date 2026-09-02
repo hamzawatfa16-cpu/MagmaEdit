@@ -5,7 +5,15 @@ public readonly record struct EditTime(long Ticks) : IComparable<EditTime>
 {
     public const long TicksPerSecond = 240000;
     public static EditTime Zero => new(0);
-    public static EditTime FromSeconds(double seconds) => new((long)Math.Round(seconds * TicksPerSecond));
+    public static EditTime FromSeconds(double seconds)
+    {
+        if (!double.IsFinite(seconds) || seconds < 0)
+            throw new ArgumentOutOfRangeException(nameof(seconds), "Seconds must be finite and non-negative.");
+        if (seconds > (double)long.MaxValue / TicksPerSecond)
+            throw new ArgumentOutOfRangeException(nameof(seconds), "Seconds exceed the supported timeline range.");
+
+        return new((long)Math.Round(seconds * TicksPerSecond));
+    }
     public double ToSeconds() => (double)Ticks / TicksPerSecond;
     public static EditTime operator +(EditTime left, EditTime right) => new(left.Ticks + right.Ticks);
     public static EditTime operator -(EditTime left, EditTime right) => new(left.Ticks - right.Ticks);
