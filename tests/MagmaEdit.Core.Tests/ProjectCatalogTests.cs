@@ -22,7 +22,10 @@ public sealed class ProjectCatalogTests
             store.Save(older, olderPath);
             Thread.Sleep(10);
             store.Save(newer, newerPath);
-            File.WriteAllText(Path.Combine(layout.Projects, "broken.magmaedit.json"), "{\"schemaVersion\":\"broken\"}");
+
+            string brokenPath = Path.Combine(layout.Projects, "broken.magmaedit.json");
+            File.WriteAllText(brokenPath, "{\"schemaVersion\":\"broken\"}");
+            File.SetLastWriteTimeUtc(brokenPath, older.ModifiedUtc.UtcDateTime.AddSeconds(-1));
 
             IReadOnlyList<ProjectSummary> summaries = new ProjectCatalog(layout).List();
 
