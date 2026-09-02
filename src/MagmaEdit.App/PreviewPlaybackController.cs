@@ -309,6 +309,10 @@ public sealed class PreviewPlaybackController : IAsyncDisposable
         Bitmap? previous = _bitmap;
         _bitmap = bitmap;
         _previewCanvas.Background = new ImageBrush(bitmap) { Stretch = Stretch.Uniform };
+        if (_previewCanvas.Child is TextBlock statusText)
+        {
+            statusText.IsVisible = false;
+        }
         previous?.Dispose();
 
         double seconds = Math.Clamp(frame.Pts.ToSeconds(), 0, _timelineSlider.Maximum);
@@ -353,6 +357,13 @@ public sealed class PreviewPlaybackController : IAsyncDisposable
         _previewCanvas.Background = Brushes.Black;
         _playButton.Content = "Play";
         _timeText.Text = "0.00 / 0.00 s";
+        if (_previewCanvas.Child is TextBlock statusText)
+        {
+            statusText.Text = message;
+            statusText.IsVisible = true;
+            return;
+        }
+
         _previewCanvas.Child = new TextBlock
         {
             Text = message,
