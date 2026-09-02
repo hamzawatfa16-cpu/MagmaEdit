@@ -782,7 +782,7 @@ public sealed class MainWindow : Window
         _mediaList.Children.Add(item);
     }
 
-    private void SelectMedia(MediaAsset asset)
+    internal void SelectMedia(MediaAsset asset)
     {
         _selectedMedia = asset;
         _selectedClip = null;
