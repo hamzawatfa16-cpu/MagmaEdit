@@ -26,8 +26,8 @@ public static class VideoFileTypes
                     return false;
 
                 Span<byte> header = stackalloc byte[12];
-                if (stream.Read(header) != header.Length ||
-                    header[4] != (byte)'f' || header[5] != (byte)'t' ||
+                stream.ReadExactly(header);
+                if (header[4] != (byte)'f' || header[5] != (byte)'t' ||
                     header[6] != (byte)'y' || header[7] != (byte)'p')
                 {
                     return false;
@@ -68,6 +68,10 @@ public static class VideoFileTypes
                 container = VideoContainer.Avi;
                 return extension.Equals(".avi", StringComparison.OrdinalIgnoreCase);
             }
+        }
+        catch (EndOfStreamException)
+        {
+            return false;
         }
         catch (IOException)
         {
