@@ -1,6 +1,6 @@
 # MagmaEdit v0.1.0
 
-This release candidate is built from the green CI-168 commit.
+This release candidate is built from the green CI tree.
 
 ## Included
 
