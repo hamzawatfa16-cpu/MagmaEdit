@@ -92,6 +92,10 @@ jobs:
             }
           }
 
+          if (-not (Test-Path (Join-Path $ffmpegBin 'ffmpeg.exe'))) {
+            throw 'FFmpeg 8 archive was downloaded, but ffmpeg.exe was not found.'
+          }
+
           "SPROCKET_FFMPEG8_DIR=$ffmpegBin" >> $env:GITHUB_ENV
           "SPROCKET_FFMPEG8_REQUIRED=$($required -join ';')" >> $env:GITHUB_ENV
           Write-Host "Using FFmpeg 8 natives from $ffmpegBin"
@@ -117,9 +121,13 @@ jobs:
           foreach ($name in ($env:SPROCKET_FFMPEG8_REQUIRED -split ';')) {
             Copy-Item (Join-Path $env:SPROCKET_FFMPEG8_DIR $name) $publishDir -Force
           }
+          Copy-Item (Join-Path $env:SPROCKET_FFMPEG8_DIR 'ffmpeg.exe') $publishDir -Force
 
           if (-not (Test-Path (Join-Path $publishDir 'MagmaEdit.exe'))) {
             throw 'The Windows publish output does not contain MagmaEdit.exe.'
+          }
+          if (-not (Test-Path (Join-Path $publishDir 'ffmpeg.exe'))) {
+            throw 'The Windows publish output does not contain ffmpeg.exe.'
           }
 
           Write-Host "Published MagmaEdit to $publishDir"
