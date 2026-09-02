@@ -31,6 +31,23 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Resolve release version
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_EVENT_NAME -eq 'push' -and $env:GITHUB_REF_NAME -eq 'main') {
+            $version = '1.0.1'
+            $releaseTag = 'v1.0.1'
+          }
+          else {
+            $version = "0.1.0.${{ github.run_number }}"
+            $releaseTag = "v$version"
+          }
+
+          "MAGMAEDIT_VERSION=$version" >> $env:GITHUB_ENV
+          "MAGMAEDIT_RELEASE_TAG=$releaseTag" >> $env:GITHUB_ENV
+          Write-Host "MagmaEdit version: $version"
+          Write-Host "MagmaEdit release tag: $releaseTag"
+
       - name: Restore
         run: dotnet restore MagmaEdit.slnx --runtime win-x64
 
@@ -104,12 +121,17 @@ jobs:
             Remove-Item $publishDir -Recurse -Force
           }
 
+          $assemblyVersion = "$env:MAGMAEDIT_VERSION.0"
           dotnet publish src/MagmaEdit.App/MagmaEdit.App.csproj `
             --configuration Release `
             --runtime win-x64 `
             --self-contained true `
             --no-restore `
-            --output $publishDir
+            --output $publishDir `
+            /p:Version=$env:MAGMAEDIT_VERSION `
+            /p:AssemblyVersion=$assemblyVersion `
+            /p:FileVersion=$assemblyVersion `
+            /p:InformationalVersion=$env:MAGMAEDIT_VERSION
           if ($LASTEXITCODE -ne 0) {
             throw "dotnet publish failed with exit code $LASTEXITCODE."
           }
@@ -139,19 +161,12 @@ jobs:
           }
           New-Item -ItemType Directory -Path $installerDir -Force | Out-Null
 
-          if ($env:GITHUB_EVENT_NAME -eq 'push' -and $env:GITHUB_REF_NAME -eq 'main') {
-            $version = '1.0.0'
-          }
-          else {
-            $version = "0.1.0.${{ github.run_number }}"
-          }
-
           $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
           if (-not (Test-Path $iscc)) {
             throw "Inno Setup compiler was not found at $iscc"
           }
 
-          & $iscc /DMagmaEditVersion="$version" installer\MagmaEdit.iss
+          & $iscc /DMagmaEditVersion="$env:MAGMAEDIT_VERSION" installer\MagmaEdit.iss
           if ($LASTEXITCODE -ne 0) {
             throw "Inno Setup failed with exit code $LASTEXITCODE."
           }
@@ -170,4 +185,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $installer = (Get-ChildItem artifacts\installer -Filter '*-Setup.exe' -File | Select-Object -First 1).FullName
-          gh release create v1.0.0 $installer --title 'MagmaEdit v1' --notes 'MagmaEdit v1 Windows installer. Download the .exe below and install normally; no terminal is required.'
+          gh release create $env:MAGMAEDIT_RELEASE_TAG $installer --title "MagmaEdit $env:MAGMAEDIT_VERSION" --notes "MagmaEdit $env:MAGMAEDIT_VERSION Windows installer. Download the .exe below and install normally; no terminal is required."
