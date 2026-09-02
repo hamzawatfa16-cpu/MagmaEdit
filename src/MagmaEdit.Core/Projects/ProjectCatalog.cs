@@ -69,8 +69,7 @@ public sealed class ProjectCatalog
         catch (Exception exception) when (
             exception is InvalidDataException or
             IOException or
-            UnauthorizedAccessException or
-            JsonException)
+            UnauthorizedAccessException)
         {
             DateTimeOffset modifiedUtc = File.Exists(fullPath)
                 ? File.GetLastWriteTimeUtc(fullPath)
