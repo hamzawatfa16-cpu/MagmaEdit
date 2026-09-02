@@ -1,3 +1,4 @@
+using System.Globalization;
 using Avalonia.Controls;
 using MagmaEdit.Core.Export;
 using MagmaEdit.Core.Projects;
@@ -86,6 +87,7 @@ internal sealed class ExportController
         if (string.IsNullOrWhiteSpace(safeName))
             safeName = "Untitled Project";
 
-        return $"{safeName} - {DateTime.Now:yyyyMMdd-HHmmss}.mp4";
+        string timestamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+        return $"{safeName} - {timestamp}.mp4";
     }
 }
