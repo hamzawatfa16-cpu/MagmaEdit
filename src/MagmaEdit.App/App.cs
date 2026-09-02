@@ -20,6 +20,7 @@ public sealed class App : Application
             _ = PreviewPlaybackController.Attach(window);
             MediaGalleryController gallery = MediaGalleryController.Attach(window);
             window.SetMediaGalleryController(gallery);
+            _ = ExportController.Attach(window);
             desktop.MainWindow = window;
         }
 
