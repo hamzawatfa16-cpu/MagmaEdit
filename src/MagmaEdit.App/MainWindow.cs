@@ -146,8 +146,8 @@ public sealed class MainWindow : Window
         {
             try
             {
-                ProjectDocument project = _projectSession.Open(defaultPath);
-                return (project, defaultPath);
+                ProjectDocument loadedProject = _projectSession.Open(defaultPath);
+            return (loadedProject, defaultPath);
             }
             catch (InvalidDataException)
             {

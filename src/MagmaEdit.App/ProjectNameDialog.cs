@@ -19,7 +19,6 @@ internal sealed class ProjectNameDialog : Window
         _nameBox = new TextBox
         {
             Text = initialName,
-            SelectAllOnFocus = true,
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
 
