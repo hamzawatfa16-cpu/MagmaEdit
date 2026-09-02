@@ -24,13 +24,13 @@ public sealed class ProjectDocument
 
     public static ProjectDocument Create(string name)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        string normalizedName = ProjectNameRules.Normalize(name);
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
         return new ProjectDocument
         {
             Id = Guid.NewGuid().ToString("N"),
-            Name = name.Trim(),
+            Name = normalizedName,
             SchemaVersion = CurrentSchemaVersion,
             CreatedUtc = now,
             ModifiedUtc = now,
