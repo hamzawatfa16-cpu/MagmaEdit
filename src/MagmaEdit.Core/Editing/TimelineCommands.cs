@@ -70,7 +70,7 @@ public sealed class RemoveTimelineClipCommand : IEditCommand
         ArgumentException.ThrowIfNullOrWhiteSpace(clipId);
         _trackId = trackId;
 
-        TimelineTrack track = editor.GetTimeline().GetTrack(trackId);
+        TimelineTrack track = editor.Timeline.GetTrack(trackId);
         int index = track.Clips.FindIndex(clip => string.Equals(clip.Id, clipId, StringComparison.Ordinal));
         if (index < 0)
             throw new KeyNotFoundException($"Timeline clip '{clipId}' does not exist.");
@@ -107,7 +107,7 @@ public sealed class TrimTimelineClipCommand : IEditCommand
         ArgumentException.ThrowIfNullOrWhiteSpace(trackId);
         ArgumentException.ThrowIfNullOrWhiteSpace(clipId);
 
-        TimelineClip clip = editor.GetTimeline().GetTrack(trackId).Clips.FirstOrDefault(existing =>
+        TimelineClip clip = editor.Timeline.GetTrack(trackId).Clips.FirstOrDefault(existing =>
             string.Equals(existing.Id, clipId, StringComparison.Ordinal))
             ?? throw new KeyNotFoundException($"Timeline clip '{clipId}' does not exist.");
 
@@ -157,7 +157,7 @@ public sealed class SplitTimelineClipCommand : IEditCommand
     {
         if (_originalClip is null)
         {
-            TimelineTrack track = _editor.GetTimeline().GetTrack(_trackId);
+            TimelineTrack track = _editor.Timeline.GetTrack(_trackId);
             TimelineClip original = track.Clips.FirstOrDefault(clip =>
                 string.Equals(clip.Id, _clipId, StringComparison.Ordinal))
                 ?? throw new KeyNotFoundException($"Timeline clip '{_clipId}' does not exist.");
