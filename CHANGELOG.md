@@ -8,6 +8,8 @@
 - Added Windows CI smoke tests for both the published executable and the installed executable.
 - Hardened the in-app updater against unvalidated download redirects.
 - Removed reflection-based gallery access to `MainWindow` state.
+- Hardened project saves with durable write-through temporary files and `.bak` snapshots of the previous valid project.
+- Added regression coverage for backup creation and temporary-file cleanup.
 
 ## 1.0.2
 
