@@ -78,6 +78,18 @@ public sealed class EditorCommandGateway : IEditorCommandGateway
         History.Execute(new SplitTimelineClipCommand(_timelineEditor, trackId, clipId, timelinePosition));
     }
 
+    public MediaAsset AddMedia(MediaAsset asset)
+    {
+        AddMediaAssetCommand command = new(_media, asset);
+        History.Execute(command);
+        return asset;
+    }
+
+    public void RemoveMedia(string mediaId)
+    {
+        History.Execute(new RemoveMediaAssetCommand(_media, mediaId));
+    }
+
     public void RenameMedia(string mediaId, string newFileName)
     {
         History.Execute(new RenameMediaAssetCommand(_media, mediaId, newFileName));
