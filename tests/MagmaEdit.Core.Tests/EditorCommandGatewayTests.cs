@@ -33,6 +33,21 @@ public sealed class EditorCommandGatewayTests
     }
 
     [Fact]
+    public void MultipleGatewaysOverOneProjectShareRuntimeHistory()
+    {
+        ProjectDocument project = ProjectDocument.Create("Shared History Test");
+        EditorCommandGateway first = new(project);
+        EditorCommandGateway second = new(project);
+
+        first.AddTrack("Video 1");
+        Assert.Equal(1, second.History.UndoCount);
+        Assert.Same(first.History, second.History);
+
+        Assert.True(second.Undo());
+        Assert.Empty(project.Timeline.Tracks);
+    }
+
+    [Fact]
     public void GatewayTrimAndSplitUseTheSameCommandLayer()
     {
         ProjectDocument project = ProjectDocument.Create("Gateway Test");
