@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using MagmaEdit.Core.Editing;
 using MagmaEdit.Core.Projects;
@@ -59,7 +60,7 @@ internal sealed class TimelineClipDuplicateShortcutController
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
-        if (_timelineList is null || !e.KeyModifiers.HasAllFlags(KeyModifiers.Control) || e.Key != Key.D)
+        if (_timelineList is null || (e.KeyModifiers & KeyModifiers.Control) == 0 || e.Key != Key.D)
         {
             return;
         }
@@ -95,7 +96,7 @@ internal sealed class TimelineClipDuplicateShortcutController
 
     private void SelectClipButton(string clipId)
     {
-        IReadOnlyDictionary<Button, (TimelineTrack Track, TimelineClip Clip)> clips = BuildClipMap();
+        Dictionary<Button, (TimelineTrack Track, TimelineClip Clip)> clips = BuildClipMap();
         Button? duplicateButton = clips.FirstOrDefault(pair =>
             string.Equals(pair.Value.Clip.Id, clipId, StringComparison.Ordinal)).Key;
         duplicateButton?.Focus();
@@ -103,7 +104,7 @@ internal sealed class TimelineClipDuplicateShortcutController
 
     private bool TryGetClip(Button button, out (TimelineTrack Track, TimelineClip Clip) clip)
     {
-        IReadOnlyDictionary<Button, (TimelineTrack Track, TimelineClip Clip)> clips = BuildClipMap();
+        Dictionary<Button, (TimelineTrack Track, TimelineClip Clip)> clips = BuildClipMap();
         if (clips.TryGetValue(button, out clip))
         {
             return true;
@@ -113,7 +114,7 @@ internal sealed class TimelineClipDuplicateShortcutController
         return false;
     }
 
-    private IReadOnlyDictionary<Button, (TimelineTrack Track, TimelineClip Clip)> BuildClipMap()
+    private Dictionary<Button, (TimelineTrack Track, TimelineClip Clip)> BuildClipMap()
     {
         var result = new Dictionary<Button, (TimelineTrack Track, TimelineClip Clip)>();
         StackPanel? timelineList = _timelineList;
@@ -122,7 +123,7 @@ internal sealed class TimelineClipDuplicateShortcutController
             return result;
         }
 
-        IReadOnlyList<TimelineTrack> tracks = _window.GetProjectForExport().Timeline.Tracks;
+        List<TimelineTrack> tracks = _window.GetProjectForExport().Timeline.Tracks;
         int trackCount = Math.Min(tracks.Count, timelineList.Children.Count);
         for (int trackIndex = 0; trackIndex < trackCount; trackIndex++)
         {
