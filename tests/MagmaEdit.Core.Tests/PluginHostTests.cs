@@ -200,11 +200,13 @@ public sealed class PluginHostTests
 
             Task<LoadedPlugin> first = manager.LoadAsync(descriptor).AsTask();
             Task<LoadedPlugin> second = manager.LoadAsync(descriptor).AsTask();
-            LoadedPlugin[] successful = await Task.WhenAll(
-                first.ContinueWith(task => task.Status == TaskStatus.RanToCompletion ? task.Result : null),
-                second.ContinueWith(task => task.Status == TaskStatus.RanToCompletion ? task.Result : null));
+            (LoadedPlugin? firstLoaded, LoadedPlugin? secondLoaded, Exception? firstError, Exception? secondError) =
+                await ObserveLoadsAsync(first, second);
 
-            Assert.Single(successful.OfType<LoadedPlugin>());
+            Assert.NotEqual(firstError is null, secondError is null);
+            Assert.Single([firstLoaded, secondLoaded].OfType<LoadedPlugin>());
+            Exception duplicateError = firstError ?? secondError!;
+            Assert.IsType<InvalidOperationException>(duplicateError);
             Assert.Equal(["com.magmaedit.tests.plugin"], manager.LoadedPluginIds);
 
             await manager.UnloadAsync("com.magmaedit.tests.plugin");
@@ -214,6 +216,36 @@ public sealed class PluginHostTests
             await manager.DisposeAsync();
             Directory.Delete(root, recursive: true);
         }
+    }
+
+    private static async Task<(LoadedPlugin? First, LoadedPlugin? Second, Exception? FirstError, Exception? SecondError)> ObserveLoadsAsync(
+        Task<LoadedPlugin> first,
+        Task<LoadedPlugin> second)
+    {
+        LoadedPlugin? firstLoaded = null;
+        LoadedPlugin? secondLoaded = null;
+        Exception? firstError = null;
+        Exception? secondError = null;
+
+        try
+        {
+            firstLoaded = await first.ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            firstError = exception;
+        }
+
+        try
+        {
+            secondLoaded = await second.ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            secondError = exception;
+        }
+
+        return (firstLoaded, secondLoaded, firstError, secondError);
     }
 
     [Fact]
