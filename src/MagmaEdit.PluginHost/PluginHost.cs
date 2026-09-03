@@ -19,7 +19,7 @@ public sealed class MagmaEditPluginHost
         Directory.CreateDirectory(_pluginDataRoot);
     }
 
-    public PluginManifest InspectManifest(string assemblyPath)
+    public static PluginManifest InspectManifest(string assemblyPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(assemblyPath);
 
