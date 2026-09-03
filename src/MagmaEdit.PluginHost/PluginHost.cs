@@ -115,7 +115,7 @@ public sealed class MagmaEditPluginHost
                 $"Plugin type '{pluginType.FullName}' must declare MagmaEditPluginAttribute metadata.");
         }
 
-        IReadOnlyList<CustomAttributeTypedArgument> arguments = attribute.ConstructorArguments;
+        IList<CustomAttributeTypedArgument> arguments = attribute.ConstructorArguments;
         if (arguments.Count != 5)
         {
             throw new InvalidDataException(
