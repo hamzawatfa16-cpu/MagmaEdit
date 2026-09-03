@@ -19,5 +19,6 @@
     <ProjectReference Include="../../src/MagmaEdit.Core/MagmaEdit.Core.csproj" />
     <ProjectReference Include="../../src/MagmaEdit.Media.Sprocket/MagmaEdit.Media.Sprocket.csproj" />
     <ProjectReference Include="../../src/MagmaEdit.Integration/MagmaEdit.Integration.csproj" />
+    <ProjectReference Include="../../src/MagmaEdit.Plugin.Abstractions/MagmaEdit.Plugin.Abstractions.csproj" />
   </ItemGroup>
 </Project>
