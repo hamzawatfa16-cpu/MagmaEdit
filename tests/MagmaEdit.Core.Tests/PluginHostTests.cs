@@ -123,6 +123,67 @@ public sealed class PluginHostTests
         }
     }
 
+    [Fact]
+    public async Task ManagerLoadsAndUnloadsPluginsByStableIdentifier()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "MagmaEditTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+
+        var manager = new PluginManager(Path.Combine(root, "data"), new TestEditorCommands());
+        try
+        {
+            string assemblyPath = typeof(PluginHostTestsPlugin).Assembly.Location;
+            PluginDescriptor descriptor = new(
+                assemblyPath,
+                MagmaEditPluginHost.InspectManifest(assemblyPath));
+
+            LoadedPlugin loaded = await manager.LoadAsync(descriptor);
+
+            Assert.Equal("com.magmaedit.tests.plugin", loaded.Manifest.Id);
+            Assert.Equal(
+                ["com.magmaedit.tests.plugin"],
+                manager.LoadedPluginIds);
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                async () => await manager.LoadAsync(descriptor));
+
+            Assert.True(await manager.UnloadAsync(loaded.Manifest.Id));
+            Assert.Empty(manager.LoadedPluginIds);
+            Assert.False(await manager.UnloadAsync(loaded.Manifest.Id));
+        }
+        finally
+        {
+            await manager.DisposeAsync();
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ManagerContinuesDisposingPluginsAfterOneShutdownFailure()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "MagmaEditTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+
+        var manager = new PluginManager(Path.Combine(root, "data"), new TestEditorCommands());
+        try
+        {
+            string assemblyPath = typeof(ThrowingShutdownPlugin).Assembly.Location;
+            PluginDescriptor descriptor = new(
+                assemblyPath,
+                MagmaEditPluginHost.InspectManifest(assemblyPath));
+
+            await manager.LoadAsync(descriptor);
+            InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(
+                async () => await manager.DisposeAsync());
+
+            Assert.Equal("Expected test shutdown failure.", exception.Message);
+            Assert.Empty(manager.LoadedPluginIds);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private sealed class TestEditorCommands : IPluginEditorCommands
     {
         public int ExecutionCount { get; private set; }
