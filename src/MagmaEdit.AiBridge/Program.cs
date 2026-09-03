@@ -52,24 +52,3 @@ app.MapPost("/v1/edit", async (
 .WithName("ExecuteAiEdit");
 
 app.Run();
-
-public static class AiBridgeSecurity
-{
-    public static bool HasValidBearerToken(string? authorization, string expectedToken)
-    {
-        const string prefix = "Bearer ";
-
-        if (string.IsNullOrEmpty(authorization) || !authorization.StartsWith(prefix, StringComparison.Ordinal))
-            return false;
-
-        string suppliedToken = authorization[prefix.Length..];
-        if (suppliedToken.Length == 0 || expectedToken.Length == 0 || suppliedToken.Length != expectedToken.Length)
-            return false;
-
-        return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
-            System.Text.Encoding.UTF8.GetBytes(suppliedToken),
-            System.Text.Encoding.UTF8.GetBytes(expectedToken));
-    }
-
-    public static bool IsMutationAllowed(bool requested, bool serverEnabled) => !requested || serverEnabled;
-}
