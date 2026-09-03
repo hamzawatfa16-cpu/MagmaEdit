@@ -75,4 +75,25 @@ public sealed class EditorCommandGatewayTests
         Assert.True(gateway.Redo());
         Assert.Equal("edited.mp4", project.Media[0].FileName);
     }
+
+    [Fact]
+    public void GatewayMediaCollectionOperationsAreUndoable()
+    {
+        ProjectDocument project = ProjectDocument.Create("Gateway Test");
+        MediaAsset asset = new("media-1", "clip.mp4", "C:\\source.mp4", "C:\\library\\clip.mp4");
+        EditorCommandGateway gateway = new(project);
+
+        Assert.Same(asset, gateway.AddMedia(asset));
+        Assert.Single(project.Media);
+        Assert.True(gateway.Undo());
+        Assert.Empty(project.Media);
+        Assert.True(gateway.Redo());
+        Assert.Single(project.Media);
+
+        gateway.RemoveMedia(asset.Id);
+        Assert.Empty(project.Media);
+        Assert.True(gateway.Undo());
+        Assert.Single(project.Media);
+        Assert.Equal(asset.Id, project.Media[0].Id);
+    }
 }
