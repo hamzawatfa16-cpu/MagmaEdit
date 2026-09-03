@@ -17,6 +17,7 @@ public sealed class WorkspaceTests
             Assert.Equal(Path.Combine(layout.Root, "Projects"), layout.Projects);
             Assert.Equal(Path.Combine(layout.Root, "Exports"), layout.Exports);
             Assert.Equal(Path.Combine(layout.Root, "Cache"), layout.Cache);
+            Assert.Equal(Path.Combine(layout.Root, "Plugins"), layout.Plugins);
         }
         finally
         {
@@ -62,6 +63,7 @@ public sealed class WorkspaceTests
             Assert.True(Directory.Exists(layout.Projects));
             Assert.True(Directory.Exists(layout.Exports));
             Assert.True(Directory.Exists(layout.Cache));
+            Assert.True(Directory.Exists(layout.Plugins));
         }
         finally
         {
