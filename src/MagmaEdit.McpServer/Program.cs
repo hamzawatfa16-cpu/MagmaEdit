@@ -88,7 +88,7 @@ webBuilder.Services
     .WithTools<MagmaEditTools>();
 
 WebApplication app = webBuilder.Build();
-string expectedToken = bearerToken!;
+string expectedToken = bearerToken;
 
 app.Use(async (context, next) =>
 {
@@ -98,7 +98,7 @@ app.Use(async (context, next) =>
         return;
     }
 
-    string requestHost = context.Request.Host.Value.Trim();
+    string requestHost = context.Request.Host.Value?.Trim() ?? string.Empty;
     if (!IsAllowedHost(requestHost, allowedHosts))
     {
         context.Response.StatusCode = StatusCodes.Status421MisdirectedRequest;
