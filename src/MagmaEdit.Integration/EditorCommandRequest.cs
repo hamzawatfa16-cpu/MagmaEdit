@@ -19,6 +19,7 @@ public enum EditorCommandKind
     AddTrack,
     RemoveTrack,
     InsertClip,
+    DuplicateClip,
     RemoveClip,
     TrimClip,
     MoveClip,
