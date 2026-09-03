@@ -53,9 +53,26 @@ public sealed class PluginCatalog
 
                 plugins.Add(new PluginDescriptor(assemblyPath, manifest));
             }
-            catch (Exception exception) when (exception is FileLoadException or FileNotFoundException or BadImageFormatException or InvalidDataException or ArgumentException or IOException)
+            catch (Exception exception) when (
+                exception is FileLoadException or
+                FileNotFoundException or
+                BadImageFormatException or
+                InvalidDataException or
+                ArgumentException or
+                IOException or
+                NotSupportedException or
+                TypeLoadException or
+                System.Reflection.ReflectionTypeLoadException)
             {
-                issues.Add(new PluginDiscoveryIssue(assemblyPath, exception.Message));
+                string message = exception is System.Reflection.ReflectionTypeLoadException reflectionException
+                    ? string.Join(
+                        Environment.NewLine,
+                        reflectionException.LoaderExceptions
+                            .Where(error => error is not null)
+                            .Select(error => error!.Message))
+                    : exception.Message;
+
+                issues.Add(new PluginDiscoveryIssue(assemblyPath, message));
             }
         }
 
