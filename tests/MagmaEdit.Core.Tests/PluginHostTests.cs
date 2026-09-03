@@ -1,6 +1,5 @@
 using MagmaEdit.Plugin.Abstractions;
 using MagmaEdit.PluginHost;
-using Xunit;
 
 namespace MagmaEdit.Core.Tests;
 
@@ -19,12 +18,14 @@ public sealed class PluginHostTests
         {
             string assemblyPath = typeof(PluginHostTestsPlugin).Assembly.Location;
             LoadedPlugin loaded = await host.LoadAsync(assemblyPath);
+            string pluginDataDirectory = Path.Combine(dataRoot, loaded.Manifest.Id);
 
             Assert.Equal("com.magmaedit.tests.plugin", loaded.Manifest.Id);
-            Assert.True(Directory.Exists(Path.Combine(dataRoot, loaded.Manifest.Id)));
+            Assert.True(Directory.Exists(pluginDataDirectory));
+            Assert.True(File.Exists(Path.Combine(pluginDataDirectory, "initialized.marker")));
 
             await loaded.DisposeAsync();
-            Assert.True(PluginHostTestsPlugin.WasShutdown);
+            Assert.True(File.Exists(Path.Combine(pluginDataDirectory, "shutdown.marker")));
         }
         finally
         {
@@ -44,8 +45,6 @@ public sealed class PluginHostTests
 
 public sealed class PluginHostTestsPlugin : IMagmaEditPlugin
 {
-    public static bool WasShutdown { get; private set; }
-
     public PluginManifest Manifest { get; } = new(
         "com.magmaedit.tests.plugin",
         "MagmaEdit Test Plugin",
@@ -55,13 +54,25 @@ public sealed class PluginHostTestsPlugin : IMagmaEditPlugin
 
     public ValueTask InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default)
     {
-        Assert.True(Directory.Exists(context.PluginDataDirectory));
+        File.WriteAllText(Path.Combine(context.PluginDataDirectory, "initialized.marker"), "initialized");
         return ValueTask.CompletedTask;
     }
 
     public ValueTask ShutdownAsync(CancellationToken cancellationToken = default)
     {
-        WasShutdown = true;
+        string assemblyDirectory = Path.GetDirectoryName(typeof(PluginHostTestsPlugin).Assembly.Location)
+            ?? throw new InvalidOperationException("Test assembly directory was not available.");
+        string? pluginDataDirectory = Directory.GetDirectories(
+            Path.Combine(Path.GetTempPath(), "MagmaEditTests"),
+            "*",
+            SearchOption.TopDirectoryOnly)
+            .FirstOrDefault(directory =>
+                File.Exists(Path.Combine(directory, "com.magmaedit.tests.plugin", "initialized.marker")));
+        if (pluginDataDirectory is not null)
+        {
+            File.WriteAllText(Path.Combine(pluginDataDirectory, "com.magmaedit.tests.plugin", "shutdown.marker"), assemblyDirectory);
+        }
+
         return ValueTask.CompletedTask;
     }
 }
