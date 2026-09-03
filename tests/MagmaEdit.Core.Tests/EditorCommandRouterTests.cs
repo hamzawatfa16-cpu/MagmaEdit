@@ -1,3 +1,4 @@
+using System.Globalization;
 using MagmaEdit.Core.Editing;
 using MagmaEdit.Core.Projects;
 using MagmaEdit.Integration;
