@@ -12,7 +12,7 @@ magmaedit.execute_editor_command
 
 The tool accepts the vendor-neutral `EditorCommandRequest` contract and routes it through the same editor command and undo/redo path used by MagmaEdit automation. Capability authorization happens before the editor router is reached.
 
-The current MCP server targets the `2026-07-28` MCP protocol through the official C# SDK 2.0 line. The official SDK supports STDIO servers and generates tool JSON Schema from the .NET tool signature. citeturn924629search0turn805175search4
+The current MCP server targets the `2026-07-28` MCP protocol through the official C# SDK 2.0 line. The SDK's STDIO transport and tool-schema generation are used without putting MCP-specific code into MagmaEdit Core.
 
 ## Local server configuration
 
