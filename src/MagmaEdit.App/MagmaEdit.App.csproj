@@ -18,6 +18,7 @@
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.1" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\MagmaEdit.Auth\MagmaEdit.Auth.csproj" />
     <ProjectReference Include="..\MagmaEdit.Core\MagmaEdit.Core.csproj" />
     <ProjectReference Include="..\MagmaEdit.Integration\MagmaEdit.Integration.csproj" />
     <ProjectReference Include="..\MagmaEdit.Plugin.Abstractions\MagmaEdit.Plugin.Abstractions.csproj" />
