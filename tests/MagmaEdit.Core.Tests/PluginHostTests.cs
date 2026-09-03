@@ -124,6 +124,33 @@ public sealed class PluginHostTests
     }
 
     [Fact]
+    public void CatalogReadsManifestWithoutRunningPluginConstructor()
+    {
+        string previous = Environment.GetEnvironmentVariable("MAGMAEDIT_TEST_FAIL_PLUGIN_CONSTRUCTOR") ?? string.Empty;
+        Environment.SetEnvironmentVariable("MAGMAEDIT_TEST_FAIL_PLUGIN_CONSTRUCTOR", "1");
+        try
+        {
+            string assemblyPath = typeof(ThrowingShutdownPlugin).Assembly.Location;
+            PluginManifest manifest = MagmaEditPluginHost.InspectManifest(assemblyPath);
+
+            Assert.Equal("com.magmaedit.tests.throwing-shutdown", manifest.Id);
+            Assert.Equal("MagmaEdit Throwing Shutdown Test Plugin", manifest.Name);
+            Assert.Equal([PluginCapability.EditorCommands], manifest.Capabilities);
+        }
+        finally
+        {
+            if (previous.Length == 0)
+            {
+                Environment.SetEnvironmentVariable("MAGMAEDIT_TEST_FAIL_PLUGIN_CONSTRUCTOR", null);
+            }
+            else
+            {
+                Environment.SetEnvironmentVariable("MAGMAEDIT_TEST_FAIL_PLUGIN_CONSTRUCTOR", previous);
+            }
+        }
+    }
+
+    [Fact]
     public async Task ManagerLoadsAndUnloadsPluginsByStableIdentifier()
     {
         string root = Path.Combine(Path.GetTempPath(), "MagmaEditTests", Guid.NewGuid().ToString("N"));
@@ -199,6 +226,12 @@ public sealed class PluginHostTests
     }
 }
 
+[MagmaEditPlugin(
+    "com.magmaedit.tests.plugin",
+    "MagmaEdit Test Plugin",
+    "1.0.0",
+    "MagmaEdit Tests",
+    PluginCapability.EditorCommands)]
 public sealed class PluginHostTestsPlugin : IMagmaEditPlugin
 {
     private string? _pluginDataDirectory;
