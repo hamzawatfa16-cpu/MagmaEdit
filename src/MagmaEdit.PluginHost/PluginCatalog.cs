@@ -37,6 +37,11 @@ public sealed class PluginCatalog
             issues.Add(new PluginDiscoveryIssue(fullRoot, exception.Message));
             return new PluginDiscoveryResult(plugins, issues);
         }
+        catch (UnauthorizedAccessException exception)
+        {
+            issues.Add(new PluginDiscoveryIssue(fullRoot, exception.Message));
+            return new PluginDiscoveryResult(plugins, issues);
+        }
 
         foreach (string assemblyPath in assemblies)
         {
@@ -60,6 +65,7 @@ public sealed class PluginCatalog
                 InvalidDataException or
                 ArgumentException or
                 IOException or
+                UnauthorizedAccessException or
                 NotSupportedException or
                 TypeLoadException or
                 System.Reflection.ReflectionTypeLoadException)
