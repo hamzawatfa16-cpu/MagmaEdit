@@ -41,6 +41,8 @@ Live commands mutate the same in-memory project used by the open editor, are per
 
 Each authenticated HTTP MCP request now carries the Supabase user ID from the trusted AI bridge through `X-MagmaEdit-User-Id`. MCP binds that identity to the current request flow and includes it in live-editor IPC requests. The desktop application can enforce `MAGMAEDIT_DESKTOP_USER_ID` so only the expected account may control that desktop session.
 
+The per-user session broker and transport boundary are documented in [`SESSION-TRANSPORT.md`](SESSION-TRANSPORT.md). The current transport registry is intentionally an in-memory development implementation; production multi-user hosting still requires durable shared state and authenticated outbound desktop connectivity.
+
 When no desktop session is available, the MCP server falls back to the configured project path. A project path is therefore optional only when a live MagmaEdit desktop session is available.
 
 ## STDIO transport
