@@ -25,6 +25,46 @@ public sealed class TimelineCommandTests
     }
 
     [Fact]
+    public void RemoveTrackCommandSupportsUndoAndRedoAndRestoresPosition()
+    {
+        TimelineDocument timeline = TimelineDocument.CreateDefault();
+        TimelineTrack first = timeline.AddTrack("Video 1");
+        TimelineTrack middle = timeline.AddTrack("Video 2");
+        TimelineTrack last = timeline.AddTrack("Video 3");
+        TimelineEditor editor = new(timeline);
+        TimelineClip clip = editor.InsertClip(middle.Id, "media", EditTime.Zero, EditTime.Zero, EditTime.FromSeconds(5));
+        EditHistory history = new();
+        RemoveTimelineTrackCommand command = new(timeline, middle.Id);
+
+        history.Execute(command);
+        Assert.Equal(2, timeline.Tracks.Count);
+        Assert.DoesNotContain(timeline.Tracks, track => track.Id == middle.Id);
+        Assert.Equal(clip.Id, command.Track.Clips[0].Id);
+
+        Assert.True(history.Undo());
+        Assert.Equal(3, timeline.Tracks.Count);
+        Assert.Equal(first.Id, timeline.Tracks[0].Id);
+        Assert.Equal(middle.Id, timeline.Tracks[1].Id);
+        Assert.Equal(last.Id, timeline.Tracks[2].Id);
+        Assert.Equal(clip.Id, timeline.Tracks[1].Clips[0].Id);
+
+        Assert.True(history.Redo());
+        Assert.Equal(2, timeline.Tracks.Count);
+        Assert.Equal(first.Id, timeline.Tracks[0].Id);
+        Assert.Equal(last.Id, timeline.Tracks[1].Id);
+    }
+
+    [Fact]
+    public void RemoveTrackCommandRejectsMissingTrack()
+    {
+        TimelineDocument timeline = TimelineDocument.CreateDefault();
+        KeyNotFoundException exception = Assert.Throws<KeyNotFoundException>(() =>
+            new RemoveTimelineTrackCommand(timeline, "missing-track"));
+
+        Assert.Equal("Timeline track 'missing-track' does not exist.", exception.Message);
+    }
+
+    [Fact]
     public void InsertClipCommandSupportsUndoAndRedo()
     {
         TimelineDocument timeline = TimelineDocument.CreateDefault();
