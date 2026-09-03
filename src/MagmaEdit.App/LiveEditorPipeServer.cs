@@ -11,12 +11,16 @@ internal sealed class LiveEditorPipeServer : IAsyncDisposable
     private readonly MainWindow _window;
     private readonly CancellationTokenSource _shutdown = new();
     private readonly Task _runTask;
+    private readonly string _expectedUserId;
     private bool _disposed;
 
-    public LiveEditorPipeServer(MainWindow window)
+    public LiveEditorPipeServer(MainWindow window, string expectedUserId)
     {
         ArgumentNullException.ThrowIfNull(window);
+        ArgumentException.ThrowIfNullOrWhiteSpace(expectedUserId);
+
         _window = window;
+        _expectedUserId = expectedUserId.Trim();
         _runTask = RunAsync();
     }
 
@@ -99,6 +103,11 @@ internal sealed class LiveEditorPipeServer : IAsyncDisposable
                 return Failure($"Unsupported live editor pipe protocol version '{request.ProtocolVersion}'.");
             }
 
+            if (!IsUserAuthorized(request.UserId))
+            {
+                return Failure("The live editor session is not authorized for this user.");
+            }
+
             return request.Operation switch
             {
                 LiveEditorPipeProtocol.ExecuteOperation => await ExecuteOnUiThreadAsync(request, cancellationToken).ConfigureAwait(false),
@@ -127,6 +136,10 @@ internal sealed class LiveEditorPipeServer : IAsyncDisposable
             return Failure(exception.Message);
         }
     }
+
+    private bool IsUserAuthorized(string? requestedUserId) =>
+        !string.IsNullOrWhiteSpace(requestedUserId)
+        && string.Equals(_expectedUserId, requestedUserId.Trim(), StringComparison.Ordinal);
 
     private Task<LiveEditorPipeResponse> ExecuteOnUiThreadAsync(
         LiveEditorPipeRequest request,

@@ -39,6 +39,8 @@ MagmaEdit.LiveEditor.v1
 
 Live commands mutate the same in-memory project used by the open editor, are persisted through the desktop application's save path, and then refresh the editor UI. The shared automation command authorization remains the enforcement boundary.
 
+Each authenticated HTTP MCP request now carries the Supabase user ID from the trusted AI bridge through `X-MagmaEdit-User-Id`. MCP binds that identity to the current request flow and includes it in live-editor IPC requests. The desktop application can enforce `MAGMAEDIT_DESKTOP_USER_ID` so only the expected account may control that desktop session.
+
 When no desktop session is available, the MCP server falls back to the configured project path. A project path is therefore optional only when a live MagmaEdit desktop session is available.
 
 ## STDIO transport
@@ -91,7 +93,9 @@ For ChatGPT specifically, a local/private MCP server is not connected directly; 
 
 The local STDIO process is intentionally local-process scoped. The desktop IPC endpoint accepts only the current Windows user. This is not account authentication.
 
-The HTTP bearer token protects the transport boundary, but it is not yet a user-account or multi-tenant authorization system. Before exposing MagmaEdit MCP to multiple users or untrusted networks, add identity-aware authentication, per-user authorization, audit logging, rate limiting, and secret rotation.
+For Streamable HTTP, the bridge authenticates the Supabase user and propagates that identity to MCP; MCP refuses requests without a user identity and the desktop pipe can enforce the configured account identity. The MCP bearer token still protects the transport and must remain secret.
+
+This is the identity-propagation layer, not the final multi-tenant session broker. A future hosted deployment still needs a durable mapping from each account to its own MCP endpoint or desktop session, plus shared/distributed rate limiting, durable audit storage, secret rotation, TLS termination, and production monitoring.
 
 ## Architecture rule
 

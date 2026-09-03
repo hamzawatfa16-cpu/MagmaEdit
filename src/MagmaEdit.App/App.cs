@@ -88,7 +88,12 @@ public sealed class App : Application, IAsyncDisposable
         TryAttach("export controller", () => _ = ExportController.Attach(window));
         TryAttach("update controller", () => _ = UpdateController.Attach(window));
         TryAttach("plugin runtime", () => StartPluginRuntime(window));
-        TryAttach("live editor IPC", () => _liveEditorPipeServer = new LiveEditorPipeServer(window));
+        TryAttach("live editor IPC", () =>
+        {
+            string userId = _authService?.CurrentSession?.UserId
+                ?? throw new InvalidOperationException("A signed-in user is required before starting live editor IPC.");
+            _liveEditorPipeServer = new LiveEditorPipeServer(window, userId);
+        });
         TryAttach("timeline duplicate shortcut", () => TimelineClipDuplicateShortcutController.Attach(window));
         window.Show();
         previousWindow?.Close();

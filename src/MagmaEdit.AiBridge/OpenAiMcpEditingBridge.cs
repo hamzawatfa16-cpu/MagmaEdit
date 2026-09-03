@@ -55,14 +55,16 @@ public sealed partial class OpenAiMcpEditingBridge
         if (request.AllowMutations)
             allowedTools.ToolNames.Add(EditingTool);
 
-        options.Tools.Add(ResponseTool.CreateMcpTool(
+        McpTool mcpTool = ResponseTool.CreateMcpTool(
             serverLabel: "magmaedit",
             serverUri: new Uri(_options.RemoteMcpUrl, UriKind.Absolute),
             allowedTools: allowedTools,
             authorizationToken: _options.RemoteMcpBearerToken,
             toolCallApprovalPolicy: request.AllowMutations
                 ? GlobalMcpToolCallApprovalPolicy.NeverRequireApproval
-                : GlobalMcpToolCallApprovalPolicy.AlwaysRequireApproval));
+                : GlobalMcpToolCallApprovalPolicy.AlwaysRequireApproval);
+        mcpTool.Headers["X-MagmaEdit-User-Id"] = userId;
+        options.Tools.Add(mcpTool);
 
         options.InputItems.Add(ResponseItem.CreateUserMessageItem(BuildPrompt(request)));
 

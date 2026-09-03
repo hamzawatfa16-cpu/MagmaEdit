@@ -21,12 +21,14 @@ var client = new MagmaEdit.Integration.AutomationClientContext(
         MagmaEdit.Integration.EditorCommandCapability.History
     });
 
-var target = new MagmaEditAutomationTarget(projectPath, client);
+var userContext = new MagmaEditUserContext();
+var target = new MagmaEditAutomationTarget(projectPath, client, userContext);
 string transport = Environment.GetEnvironmentVariable("MAGMAEDIT_MCP_TRANSPORT")?.Trim() ?? "stdio";
 
 if (!string.Equals(transport, "streamable-http", StringComparison.OrdinalIgnoreCase))
 {
     HostApplicationBuilder builder = Host.CreateEmptyApplicationBuilder(settings: null);
+    builder.Services.AddSingleton(userContext);
     builder.Services.AddSingleton(target);
     builder.Services
         .AddMcpServer()
@@ -81,6 +83,7 @@ HashSet<string> allowedOrigins = ParseList(
     $"{listenUri.Scheme}://[::1]:{listenUri.Port}");
 
 WebApplicationBuilder webBuilder = WebApplication.CreateBuilder(args);
+webBuilder.Services.AddSingleton(userContext);
 webBuilder.Services.AddSingleton(target);
 webBuilder.Services
     .AddMcpServer()
@@ -134,7 +137,22 @@ app.Use(async (context, next) =>
         return;
     }
 
-    await next().ConfigureAwait(false);
+    string userId = context.Request.Headers["X-MagmaEdit-User-Id"].ToString().Trim();
+    if (string.IsNullOrWhiteSpace(userId))
+    {
+        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        return;
+    }
+
+    userContext.UserId = userId;
+    try
+    {
+        await next().ConfigureAwait(false);
+    }
+    finally
+    {
+        userContext.UserId = null;
+    }
 });
 
 app.MapMcp("/mcp");
