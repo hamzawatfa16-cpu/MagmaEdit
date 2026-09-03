@@ -18,5 +18,6 @@ public sealed class WorkspaceManager
         Directory.CreateDirectory(Layout.Projects);
         Directory.CreateDirectory(Layout.Exports);
         Directory.CreateDirectory(Layout.Cache);
+        Directory.CreateDirectory(Layout.Plugins);
     }
 }
