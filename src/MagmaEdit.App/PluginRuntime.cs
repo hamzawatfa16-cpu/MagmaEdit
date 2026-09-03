@@ -1,3 +1,4 @@
+using System.Reflection;
 using MagmaEdit.Core.Workspace;
 using MagmaEdit.PluginHost;
 
@@ -61,7 +62,17 @@ internal sealed class PluginRuntime : IAsyncDisposable
             report($"Loaded plugin: {descriptor.Manifest.Name}");
             return true;
         }
-        catch (Exception exception) when (exception is FileLoadException or FileNotFoundException or BadImageFormatException or InvalidDataException or ArgumentException or InvalidOperationException or IOException)
+        catch (Exception exception) when (
+            exception is FileLoadException or
+            FileNotFoundException or
+            BadImageFormatException or
+            InvalidDataException or
+            ArgumentException or
+            InvalidOperationException or
+            IOException or
+            UnauthorizedAccessException or
+            TypeLoadException or
+            ReflectionTypeLoadException)
         {
             report($"Plugin failed to load: {descriptor.Manifest.Name}: {exception.Message}");
             return false;
@@ -87,7 +98,17 @@ internal sealed class PluginRuntime : IAsyncDisposable
 
             return unloaded;
         }
-        catch (Exception exception) when (exception is FileLoadException or FileNotFoundException or BadImageFormatException or InvalidDataException or ArgumentException or InvalidOperationException or IOException)
+        catch (Exception exception) when (
+            exception is FileLoadException or
+            FileNotFoundException or
+            BadImageFormatException or
+            InvalidDataException or
+            ArgumentException or
+            InvalidOperationException or
+            IOException or
+            UnauthorizedAccessException or
+            TypeLoadException or
+            ReflectionTypeLoadException)
         {
             report($"Plugin failed to unload: {pluginId}: {exception.Message}");
             return false;
