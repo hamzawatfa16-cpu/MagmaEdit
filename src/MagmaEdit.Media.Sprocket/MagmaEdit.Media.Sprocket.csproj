@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>MagmaEdit.Media.Sprocket</RootNamespace>
+    <AssemblyName>MagmaEdit.Media.Sprocket</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MagmaEdit.Core\MagmaEdit.Core.csproj" />
+    <ProjectReference Include="..\..\third_party\sprocket\src\Sprocket.Core\Sprocket.Core.csproj" />
+    <ProjectReference Include="..\..\third_party\sprocket\src\Sprocket.Media\Sprocket.Media.csproj" />
+  </ItemGroup>
+</Project>
