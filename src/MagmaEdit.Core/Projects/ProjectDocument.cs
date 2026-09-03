@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using MagmaEdit.Core.Editing;
 using MagmaEdit.Core.Media;
 
@@ -21,6 +22,9 @@ public sealed class ProjectDocument
     public List<MediaAsset> Media { get; init; } = [];
 
     public TimelineDocument Timeline { get; init; } = TimelineDocument.CreateDefault();
+
+    [JsonIgnore]
+    public EditHistory EditHistory { get; } = new();
 
     public static ProjectDocument Create(string name)
     {
