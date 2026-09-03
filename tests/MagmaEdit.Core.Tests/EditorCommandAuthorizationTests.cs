@@ -109,16 +109,14 @@ public sealed class EditorCommandAuthorizationTests
     }
 
     [Fact]
-    public void McpContractExposesOneStableEditorTool()
+    public void McpContractExposesStableEditorTools()
     {
         Assert.Equal("1", McpEditorToolContract.ContractVersion);
-        Assert.Equal(
-            "magmaedit.execute_editor_command",
-            McpEditorToolContract.ExecuteEditorCommandToolName);
-        Assert.Single(McpEditorToolContract.Definitions);
-        Assert.Equal(
-            McpEditorToolContract.ExecuteEditorCommand,
-            McpEditorToolContract.Definitions[0]);
+        Assert.Equal("magmaedit.execute_editor_command", McpEditorToolContract.ExecuteEditorCommandToolName);
+        Assert.Equal("magmaedit.get_editor_state", McpEditorToolContract.GetEditorStateToolName);
+        Assert.Equal(2, McpEditorToolContract.Definitions.Count);
+        Assert.Equal(McpEditorToolContract.ExecuteEditorCommand, McpEditorToolContract.Definitions[0]);
+        Assert.Equal(McpEditorToolContract.GetEditorState, McpEditorToolContract.Definitions[1]);
         Assert.Equal(
             Enum.GetValues<EditorCommandKind>(),
             McpEditorToolContract.ExecuteEditorCommand.Commands);
@@ -129,5 +127,7 @@ public sealed class EditorCommandAuthorizationTests
                 EditorCommandCapability.History
             ],
             McpEditorToolContract.ExecuteEditorCommand.Capabilities);
+        Assert.Empty(McpEditorToolContract.GetEditorState.Commands);
+        Assert.Empty(McpEditorToolContract.GetEditorState.Capabilities);
     }
 }
