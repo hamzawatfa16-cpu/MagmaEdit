@@ -19,6 +19,31 @@ public sealed class MagmaEditPluginHost
         Directory.CreateDirectory(_pluginDataRoot);
     }
 
+    public PluginManifest InspectManifest(string assemblyPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(assemblyPath);
+
+        string fullAssemblyPath = Path.GetFullPath(assemblyPath);
+        if (!File.Exists(fullAssemblyPath))
+        {
+            throw new FileNotFoundException("Plugin assembly was not found.", fullAssemblyPath);
+        }
+
+        var loadContext = new PluginLoadContext(fullAssemblyPath);
+        try
+        {
+            Assembly assembly = loadContext.LoadFromAssemblyPath(fullAssemblyPath);
+            Type pluginType = FindPluginType(assembly);
+            var plugin = (IMagmaEditPlugin)Activator.CreateInstance(pluginType)!;
+            ValidateManifest(plugin.Manifest);
+            return plugin.Manifest;
+        }
+        finally
+        {
+            loadContext.Unload();
+        }
+    }
+
     public async ValueTask<LoadedPlugin> LoadAsync(
         string assemblyPath,
         CancellationToken cancellationToken = default)
