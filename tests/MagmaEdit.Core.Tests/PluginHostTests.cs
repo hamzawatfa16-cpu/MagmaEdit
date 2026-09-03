@@ -45,6 +45,8 @@ public sealed class PluginHostTests
 
 public sealed class PluginHostTestsPlugin : IMagmaEditPlugin
 {
+    private string? _pluginDataDirectory;
+
     public PluginManifest Manifest { get; } = new(
         "com.magmaedit.tests.plugin",
         "MagmaEdit Test Plugin",
@@ -54,25 +56,19 @@ public sealed class PluginHostTestsPlugin : IMagmaEditPlugin
 
     public ValueTask InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default)
     {
-        File.WriteAllText(Path.Combine(context.PluginDataDirectory, "initialized.marker"), "initialized");
+        _pluginDataDirectory = context.PluginDataDirectory;
+        File.WriteAllText(Path.Combine(_pluginDataDirectory, "initialized.marker"), "initialized");
         return ValueTask.CompletedTask;
     }
 
     public ValueTask ShutdownAsync(CancellationToken cancellationToken = default)
     {
-        string assemblyDirectory = Path.GetDirectoryName(typeof(PluginHostTestsPlugin).Assembly.Location)
-            ?? throw new InvalidOperationException("Test assembly directory was not available.");
-        string? pluginDataDirectory = Directory.GetDirectories(
-            Path.Combine(Path.GetTempPath(), "MagmaEditTests"),
-            "*",
-            SearchOption.TopDirectoryOnly)
-            .FirstOrDefault(directory =>
-                File.Exists(Path.Combine(directory, "com.magmaedit.tests.plugin", "initialized.marker")));
-        if (pluginDataDirectory is not null)
+        if (_pluginDataDirectory is null)
         {
-            File.WriteAllText(Path.Combine(pluginDataDirectory, "com.magmaedit.tests.plugin", "shutdown.marker"), assemblyDirectory);
+            throw new InvalidOperationException("Plugin was not initialized.");
         }
 
+        File.WriteAllText(Path.Combine(_pluginDataDirectory, "shutdown.marker"), "shutdown");
         return ValueTask.CompletedTask;
     }
 }
