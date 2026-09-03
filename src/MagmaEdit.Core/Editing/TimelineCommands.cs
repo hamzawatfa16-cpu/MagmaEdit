@@ -126,6 +126,43 @@ public sealed class TrimTimelineClipCommand : IEditCommand
     public void Revert() => _editor.TrimClip(_trackId, _clipId, _oldSourceIn, _oldSourceOut);
 }
 
+public sealed class MoveTimelineClipCommand : IEditCommand
+{
+    private readonly TimelineEditor _editor;
+    private readonly string _trackId;
+    private readonly string _clipId;
+    private readonly EditTime _oldTimelineStart;
+    private readonly EditTime _newTimelineStart;
+
+    public MoveTimelineClipCommand(
+        TimelineEditor editor,
+        string trackId,
+        string clipId,
+        EditTime newTimelineStart)
+    {
+        _editor = editor ?? throw new ArgumentNullException(nameof(editor));
+        ArgumentException.ThrowIfNullOrWhiteSpace(trackId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(clipId);
+        if (newTimelineStart.Ticks < 0)
+            throw new ArgumentOutOfRangeException(nameof(newTimelineStart), "Timeline position cannot be negative.");
+
+        TimelineClip clip = editor.Timeline.GetTrack(trackId).Clips.FirstOrDefault(existing =>
+            string.Equals(existing.Id, clipId, StringComparison.Ordinal))
+            ?? throw new KeyNotFoundException($"Timeline clip '{clipId}' does not exist.");
+
+        _trackId = trackId;
+        _clipId = clipId;
+        _oldTimelineStart = clip.TimelineStart;
+        _newTimelineStart = newTimelineStart;
+    }
+
+    public string Label => "Move clip";
+
+    public void Apply() => _editor.MoveClip(_trackId, _clipId, _newTimelineStart);
+
+    public void Revert() => _editor.MoveClip(_trackId, _clipId, _oldTimelineStart);
+}
+
 public sealed class SplitTimelineClipCommand : IEditCommand
 {
     private readonly TimelineEditor _editor;
