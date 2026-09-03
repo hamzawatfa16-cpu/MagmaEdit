@@ -76,10 +76,10 @@ public sealed class EditorAutomationSession
                 asset.SourcePath,
                 asset.LibraryPath,
                 asset.IsPublished,
-                asset.Metadata?.DurationSeconds,
+                asset.Metadata?.Duration.TotalSeconds,
                 asset.Metadata?.Width,
                 asset.Metadata?.Height,
-                asset.Metadata?.FrameRate))
+                asset.Metadata?.FramesPerSecond))
             .ToArray();
 
         IReadOnlyList<EditorTrackState> tracks = Project.Timeline.Tracks
