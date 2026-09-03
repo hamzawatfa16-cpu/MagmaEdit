@@ -11,14 +11,16 @@ internal sealed class LiveEditorPipeServer : IAsyncDisposable
     private readonly MainWindow _window;
     private readonly CancellationTokenSource _shutdown = new();
     private readonly Task _runTask;
-    private readonly string? _configuredUserId =
-        Environment.GetEnvironmentVariable("MAGMAEDIT_DESKTOP_USER_ID")?.Trim();
+    private readonly string _expectedUserId;
     private bool _disposed;
 
-    public LiveEditorPipeServer(MainWindow window)
+    public LiveEditorPipeServer(MainWindow window, string expectedUserId)
     {
         ArgumentNullException.ThrowIfNull(window);
+        ArgumentException.ThrowIfNullOrWhiteSpace(expectedUserId);
+
         _window = window;
+        _expectedUserId = expectedUserId.Trim();
         _runTask = RunAsync();
     }
 
@@ -135,15 +137,9 @@ internal sealed class LiveEditorPipeServer : IAsyncDisposable
         }
     }
 
-    private bool IsUserAuthorized(string? requestedUserId)
-    {
-        if (string.IsNullOrWhiteSpace(_configuredUserId))
-        {
-            return !string.IsNullOrWhiteSpace(requestedUserId) || requestedUserId is null;
-        }
-
-        return string.Equals(_configuredUserId, requestedUserId, StringComparison.Ordinal);
-    }
+    private bool IsUserAuthorized(string? requestedUserId) =>
+        !string.IsNullOrWhiteSpace(requestedUserId)
+        && string.Equals(_expectedUserId, requestedUserId.Trim(), StringComparison.Ordinal);
 
     private Task<LiveEditorPipeResponse> ExecuteOnUiThreadAsync(
         LiveEditorPipeRequest request,
