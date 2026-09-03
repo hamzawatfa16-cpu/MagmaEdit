@@ -44,6 +44,40 @@ public sealed class AiBridgeSecurityTests
     }
 
     [Fact]
+    public void UserAllowlistDefaultsToOpenWhenEmpty()
+    {
+        HashSet<string> allowedUserIds = new(StringComparer.Ordinal);
+
+        Assert.True(AiBridgeSecurity.IsUserAllowed("user-a", allowedUserIds));
+    }
+
+    [Fact]
+    public void UserAllowlistRejectsUnknownUser()
+    {
+        HashSet<string> allowedUserIds = ["user-a"];
+
+        Assert.False(AiBridgeSecurity.IsUserAllowed("user-b", allowedUserIds));
+        Assert.True(AiBridgeSecurity.IsUserAllowed("user-a", allowedUserIds));
+    }
+
+    [Fact]
+    public void MutationsRequireSingleAuthorizedUser()
+    {
+        HashSet<string> allowedUserIds = ["user-a"];
+
+        Assert.True(AiBridgeSecurity.IsMutationAllowed(true, true, "user-a", allowedUserIds));
+        Assert.False(AiBridgeSecurity.IsMutationAllowed(true, true, "user-b", allowedUserIds));
+    }
+
+    [Fact]
+    public void MutationsRemainDisabledForMultipleAuthorizedUsers()
+    {
+        HashSet<string> allowedUserIds = ["user-a", "user-b"];
+
+        Assert.False(AiBridgeSecurity.IsMutationAllowed(true, true, "user-a", allowedUserIds));
+    }
+
+    [Fact]
     public void BearerPrefixIsCaseSensitive()
     {
         Assert.False(AiBridgeSecurity.HasValidBearerToken("bearer secret-token", "secret-token"));

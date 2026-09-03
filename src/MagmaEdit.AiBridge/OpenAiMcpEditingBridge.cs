@@ -24,9 +24,11 @@ public sealed partial class OpenAiMcpEditingBridge
 
     public async Task<AiBridgeResult> EditAsync(
         AiEditRequest request,
+        string userId,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        ArgumentException.ThrowIfNullOrWhiteSpace(userId);
         ArgumentException.ThrowIfNullOrWhiteSpace(request.Prompt);
 
         if (request.Prompt.Length > 12000)
@@ -64,12 +66,12 @@ public sealed partial class OpenAiMcpEditingBridge
 
         options.InputItems.Add(ResponseItem.CreateUserMessageItem(BuildPrompt(request)));
 
-        LogStarting(request.AllowMutations, _options.OpenAiModel);
+        LogStarting(userId, request.AllowMutations, _options.OpenAiModel);
 
         ResponseResult response = await _client.CreateResponseAsync(options, cancellationToken);
 
         string output = response.GetOutputText();
-        LogCompleted(response.Id, output.Length);
+        LogCompleted(userId, response.Id, output.Length);
 
         return new AiBridgeResult(
             response.Id,
@@ -90,14 +92,14 @@ public sealed partial class OpenAiMcpEditingBridge
     [LoggerMessage(
         EventId = 1000,
         Level = LogLevel.Information,
-        Message = "Starting AI edit request. MutationsEnabled={MutationsEnabled}, Model={Model}")]
-    private partial void LogStarting(bool mutationsEnabled, string model);
+        Message = "Starting AI edit request. UserId={UserId}, MutationsEnabled={MutationsEnabled}, Model={Model}")]
+    private partial void LogStarting(string userId, bool mutationsEnabled, string model);
 
     [LoggerMessage(
         EventId = 1001,
         Level = LogLevel.Information,
-        Message = "AI edit request completed. ResponseId={ResponseId}, OutputLength={OutputLength}")]
-    private partial void LogCompleted(string responseId, int outputLength);
+        Message = "AI edit request completed. UserId={UserId}, ResponseId={ResponseId}, OutputLength={OutputLength}")]
+    private partial void LogCompleted(string userId, string responseId, int outputLength);
 }
 
 public sealed record AiEditRequest(
