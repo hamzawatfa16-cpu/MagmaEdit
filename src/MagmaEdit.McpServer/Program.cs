@@ -130,7 +130,7 @@ app.Use(async (context, next) =>
 });
 
 app.MapMcp("/mcp");
-app.Run(listenUri);
+app.Run(listenUri.ToString());
 
 static HashSet<string> ParseList(string? value, params string[] defaults)
 {
