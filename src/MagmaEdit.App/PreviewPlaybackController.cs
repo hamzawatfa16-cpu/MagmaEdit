@@ -8,11 +8,11 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Threading;
 using MagmaEdit.Core.Media;
-using Sprocket.Core.Timing;
+using MagmaEdit.Media.Sprocket;
 
 namespace MagmaEdit.App;
 
-/// <summary>Connects the existing preview surface to a persistent FFmpeg-backed playback session.</summary>
+/// <summary>Connects the existing preview surface to the persistent FFmpeg-backed playback adapter.</summary>
 public sealed class PreviewPlaybackController : IAsyncDisposable
 {
     private readonly Window _window;
@@ -198,8 +198,8 @@ public sealed class PreviewPlaybackController : IAsyncDisposable
 
     private async Task PlaybackLoopAsync(MediaPlaybackSession session, CancellationToken cancellationToken)
     {
-        double fps = session.Info.FrameRate.Num > 0 && session.Info.FrameRate.Den > 0
-            ? (double)session.Info.FrameRate.Num / session.Info.FrameRate.Den
+        double fps = double.IsFinite(session.Info.FramesPerSecond) && session.Info.FramesPerSecond > 0
+            ? session.Info.FramesPerSecond
             : 30.0;
         TimeSpan frameDelay = TimeSpan.FromSeconds(1.0 / Math.Clamp(fps, 1.0, 240.0));
         bool reachedEnd = false;
@@ -280,7 +280,7 @@ public sealed class PreviewPlaybackController : IAsyncDisposable
         try
         {
             DecodedPreviewFrame? frame = await session
-                .SeekAndReadFrameAsync(Timecode.FromSeconds(seconds), scrub.Token)
+                .SeekAndReadFrameAsync(TimeSpan.FromSeconds(seconds), scrub.Token)
                 .ConfigureAwait(false);
             if (frame is null || scrub.IsCancellationRequested)
             {
@@ -301,6 +301,9 @@ public sealed class PreviewPlaybackController : IAsyncDisposable
         catch (ObjectDisposedException)
         {
         }
+        catch (ArgumentOutOfRangeException)
+        {
+        }
     }
 
     private void ApplyPreviewFrame(DecodedPreviewFrame frame)
@@ -315,7 +318,7 @@ public sealed class PreviewPlaybackController : IAsyncDisposable
         }
         previous?.Dispose();
 
-        double seconds = Math.Clamp(frame.Pts.ToSeconds(), 0, _timelineSlider.Maximum);
+        double seconds = Math.Clamp(frame.PresentationTime.TotalSeconds, 0, _timelineSlider.Maximum);
         _updatingSlider = true;
         try
         {
@@ -329,9 +332,9 @@ public sealed class PreviewPlaybackController : IAsyncDisposable
         UpdateTimeText(seconds);
     }
 
-    private void ConfigureDuration(Timecode duration)
+    private void ConfigureDuration(TimeSpan duration)
     {
-        double seconds = Math.Max(0, duration.ToSeconds());
+        double seconds = Math.Max(0, duration.TotalSeconds);
         _updatingSlider = true;
         try
         {

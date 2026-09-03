@@ -1,22 +1,12 @@
 using System.Runtime.InteropServices;
+using MagmaEdit.Core.Media;
 using Sprocket.Core.Model;
 using Sprocket.Core.Timing;
 using Sprocket.Media;
 
-namespace MagmaEdit.Core.Media;
+namespace MagmaEdit.Media.Sprocket;
 
-/// <summary>A decoded RGBA frame for the desktop preview surface.</summary>
-public sealed record DecodedPreviewFrame(
-    int Width,
-    int Height,
-    int RowBytes,
-    byte[] Pixels,
-    Timecode Pts = default);
-
-/// <summary>
-/// Reads decoded frames from a real FFmpeg-backed Sprocket decoder while serializing the single-consumer
-/// read path. The session stays open between frames so playback does not reopen the video for every frame.
-/// </summary>
+/// <summary>Reads decoded frames from a real FFmpeg-backed Sprocket decoder.</summary>
 public sealed class MediaPlaybackSession : IAsyncDisposable
 {
     private readonly VideoDecodeRing _ring;
@@ -34,16 +24,15 @@ public sealed class MediaPlaybackSession : IAsyncDisposable
         }
 
         MediaSource source = MediaSource.Open(fullPath);
-        Info = source.Info;
+        Info = ToProbeResult(source.Info);
         _ring = new VideoDecodeRing(source);
         _ring.Start();
         _ring.RequestSeek(Timecode.Zero);
     }
 
-    /// <summary>Stream metadata obtained from the same decoder used for playback.</summary>
-    public ProbedMediaInfo Info { get; }
+    /// <summary>Stream metadata exposed using MagmaEdit-owned values.</summary>
+    public MediaProbeResult Info { get; }
 
-    /// <summary>Reads the next frame in presentation order, or null at end of stream.</summary>
     public async Task<DecodedPreviewFrame?> ReadNextFrameAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -59,16 +48,20 @@ public sealed class MediaPlaybackSession : IAsyncDisposable
         }
     }
 
-    /// <summary>Requests a frame-accurate seek and returns the first decoded frame at/after the target.</summary>
     public async Task<DecodedPreviewFrame?> SeekAndReadFrameAsync(
-        Timecode target,
+        TimeSpan target,
         CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        if (target < TimeSpan.Zero || !double.IsFinite(target.TotalSeconds))
+        {
+            throw new ArgumentOutOfRangeException(nameof(target), "The preview seek position must be finite and non-negative.");
+        }
+
         await _readGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            _ring.RequestSeek(target);
+            _ring.RequestSeek(Timecode.FromSeconds(target.TotalSeconds));
             VideoFrame? frame = await _ring.ReadAsync(cancellationToken).ConfigureAwait(false);
             return frame is null ? null : CopyFrame(frame);
         }
@@ -103,18 +96,50 @@ public sealed class MediaPlaybackSession : IAsyncDisposable
                 Marshal.Copy(source, pixels, checked(y * destinationStride), destinationStride);
             }
 
-            return new DecodedPreviewFrame(frame.Width, frame.Height, destinationStride, pixels, frame.Pts);
+            return new DecodedPreviewFrame(
+                frame.Width,
+                frame.Height,
+                destinationStride,
+                pixels,
+                TimeSpan.FromSeconds(frame.Pts.ToSeconds()));
         }
         finally
         {
             frame.Dispose();
         }
     }
+
+    private static MediaProbeResult ToProbeResult(ProbedMediaInfo info)
+    {
+        double framesPerSecond = info.FrameRate.Den > 0
+            ? (double)info.FrameRate.Num / info.FrameRate.Den
+            : 0d;
+
+        return new MediaProbeResult(
+            Duration: TimeSpan.FromSeconds(info.Duration.ToSeconds()),
+            HasVideo: info.HasVideo,
+            Width: info.Width,
+            Height: info.Height,
+            FramesPerSecond: framesPerSecond,
+            HasAudio: info.HasAudio,
+            SampleRate: info.SampleRate,
+            Channels: info.Channels,
+            HasAlpha: info.HasAlpha,
+            VideoCodec: info.VideoCodec,
+            AudioCodec: info.AudioCodec,
+            PixelFormat: info.PixelFormatName,
+            BitDepth: info.BitDepth,
+            IsHdr: info.IsHdr,
+            IsVariableFrameRate: info.IsVariableFrameRate,
+            ColorRange: info.ColorRange,
+            ColorPrimaries: info.ColorPrimaries,
+            ColorTransfer: info.ColorTransfer,
+            ColorSpace: info.ColorSpace,
+            ChromaSubsampling: info.ChromaSubsampling);
+    }
 }
 
-/// <summary>
-/// Compatibility helper for callers that only need a single decoded first frame.
-/// </summary>
+/// <summary>Decodes the first video frame for the static preview surface.</summary>
 public static class MediaPreviewService
 {
     public static async Task<DecodedPreviewFrame> DecodeFirstFrameAsync(
