@@ -13,15 +13,16 @@ public sealed class MagmaEditTools
         Destructive = true,
         Idempotent = false,
         OpenWorld = false)]
-    [Description("Execute one validated and authorized MagmaEdit editor command against the configured project.")]
-    public static MagmaEdit.Integration.EditorCommandResult ExecuteEditorCommand(
+    [Description("Execute one validated and authorized MagmaEdit editor command against the live desktop session when available, otherwise the configured project.")]
+    public static Task<MagmaEdit.Integration.EditorCommandResult> ExecuteEditorCommand(
         [Description("The MagmaEdit editor command and its command-specific parameters.")]
         MagmaEdit.Integration.EditorCommandRequest request,
-        MagmaEdit.Integration.EditorAutomationSession session)
+        MagmaEditAutomationTarget target,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        ArgumentNullException.ThrowIfNull(session);
-        return session.Execute(request);
+        ArgumentNullException.ThrowIfNull(target);
+        return target.ExecuteAsync(request, cancellationToken);
     }
 
     [McpServerTool(
@@ -31,11 +32,12 @@ public sealed class MagmaEditTools
         Destructive = false,
         Idempotent = true,
         OpenWorld = false)]
-    [Description("Return a read-only snapshot of the loaded MagmaEdit project, timeline, media, and undo/redo counts.")]
-    public static MagmaEdit.Integration.EditorProjectState GetEditorState(
-        MagmaEdit.Integration.EditorAutomationSession session)
+    [Description("Return a read-only snapshot of the live MagmaEdit project when the desktop app is running, otherwise the configured project.")]
+    public static Task<MagmaEdit.Integration.EditorProjectState> GetEditorState(
+        MagmaEditAutomationTarget target,
+        CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(session);
-        return session.GetState();
+        ArgumentNullException.ThrowIfNull(target);
+        return target.GetStateAsync(cancellationToken);
     }
 }
