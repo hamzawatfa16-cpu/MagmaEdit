@@ -1,3 +1,5 @@
+using MagmaEdit.Core.Media;
+
 namespace MagmaEdit.Core.Editing;
 
 /// <summary>Provides the single command entry point shared by the desktop UI and future automation clients.</summary>
