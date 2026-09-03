@@ -18,10 +18,10 @@ MagmaEdit currently contains:
 - A Sprocket-backed media probe/export boundary.
 - A shared `IEditorCommandGateway` so editor mutations can be exposed through one command path.
 - Undoable media-collection and timeline operations with regression tests.
-- A vendor-neutral `MagmaEdit.Integration` command contract, validation, capability metadata, and router for future AI/plugin clients.
-- An explicit capability-based authorization boundary for automation clients.
-- A MagmaEdit-owned, transport-neutral MCP editor tool contract; no MCP network/server implementation is claimed yet.
-- A MagmaEdit-owned plugin abstraction and collectible plugin host with manifest validation, per-plugin data directories, lifecycle handling, and regression tests.
+- A vendor-neutral `MagmaEdit.Integration` command contract, validation, capability metadata, authorization, and routing for AI/plugin clients.
+- Google-first browser authentication with PKCE and Windows current-user DPAPI session persistence.
+- A MagmaEdit-owned MCP editor tool contract with local STDIO and authenticated Streamable HTTP transports.
+- A MagmaEdit-owned plugin abstraction and collectible plugin host with manifest validation, per-plugin data directories, capability gating, lifecycle handling, and regression tests.
 - Strict nullable/analyzer/format/build/test gates in CI, including Windows publishing and installer creation.
 - A pinned Sprocket submodule whose revision is verified by CI.
 
@@ -29,14 +29,14 @@ MagmaEdit currently contains:
 
 The following are planned but are not currently present as finished MagmaEdit-owned features:
 
-1. Authentication and account/session UI.
-2. The actual MCP protocol server/transport and external connection lifecycle.
-3. A hosted AI bridge for external AI clients.
-4. Complete migration of the desktop UI away from direct project-model mutations and its private history instance.
-5. Full replacement of upstream/Sprocket implementation details behind MagmaEdit-owned interfaces.
-6. Final product branding, assets, packaging identity, and release polish.
+1. A hosted AI bridge and polished end-to-end ChatGPT/Claude/Grok client experience.
+2. Complete production hardening of the plugin host, including broader failure-safe lifecycle and isolation coverage.
+3. Final product branding, assets, packaging identity, onboarding, and release polish.
+4. Full replacement of upstream/Sprocket implementation details behind MagmaEdit-owned interfaces.
+5. A professional timeline interaction layer: playhead, drag/drop editing, snapping, zoom, multi-select, and richer track interaction.
+6. Broader editing features beyond the current foundation: text/overlays, images, audio, transitions, effects, speed/volume controls, crop/position controls, and expanded export options.
 
-These items must not be described as already implemented until the corresponding code and tests exist in this repository.
+The implemented authentication and MCP transport features above must not be described as unfinished elsewhere in the repository without a specific code-level reason.
 
 ## Architecture direction
 
@@ -52,7 +52,7 @@ The intended dependency direction is:
 
 `MagmaEdit.PluginHost` -> `MagmaEdit.Plugin.Abstractions`
 
-Future MCP/plugin/hosted integrations must depend on the vendor-neutral command boundary and its authorization layer rather than introducing vendor-specific concepts into Core.
+MCP transports, plugins, and future hosted AI integrations must depend on the vendor-neutral command boundary and its authorization layer rather than introducing vendor-specific concepts into Core.
 
 ## Strict engineering rules
 
@@ -65,7 +65,7 @@ Future MCP/plugin/hosted integrations must depend on the vendor-neutral command 
 - Third-party notices and required licenses must remain with redistributed upstream code.
 - No large upstream source copy is allowed merely for convenience; import only code that passes the audit.
 - External automation clients must receive explicit capabilities before their commands reach the editor router.
-- The MCP contract must remain transport-neutral so a future protocol implementation can be replaced or upgraded without changing Core.
+- MCP transports must use the MagmaEdit-owned command/tool contract so protocol changes do not leak into Core.
 
 ## Upstream/Sprocket boundary
 
@@ -77,12 +77,12 @@ MagmaEdit should progressively replace direct dependence on upstream application
 
 The next implementation work should proceed in this order:
 
-1. Complete the command-gateway migration in the desktop application so direct timeline/media mutations are removed from UI code where an equivalent gateway operation exists.
-2. Strengthen the vendor-neutral integration boundary with explicit validation and capability metadata needed by future plugins and MCP tools.
-3. Harden the MagmaEdit-owned plugin host with failure-safe lifecycle cleanup and additional isolation tests.
-4. Build the MCP protocol server/transport around the existing MagmaEdit-owned tool contract and authorization boundary.
-5. Build authentication/session infrastructure after the local editor command path and external authorization boundary are stable.
-6. Gradually replace or isolate remaining upstream implementation details while maintaining required licenses/notices.
+1. Harden the MagmaEdit-owned plugin host with failure-safe lifecycle cleanup and additional isolation tests.
+2. Build the hosted AI bridge and complete the end-to-end external AI editing experience on top of the existing MCP/command boundary.
+3. Improve the professional timeline interaction layer without reintroducing unnecessary complexity or accidental cross-track behavior.
+4. Add the next editing feature set: text/overlays, images, audio, transitions/effects, speed/volume, crop/position, and richer export controls.
+5. Gradually replace or isolate remaining upstream implementation details while maintaining required licenses/notices.
+6. Finish product branding, onboarding, settings, packaging identity, and release polish.
 
 ## Rule
 
