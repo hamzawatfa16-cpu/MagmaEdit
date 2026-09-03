@@ -71,7 +71,12 @@ public sealed class MagmaEditSessionBroker
         return false;
     }
 
-    public bool TryRenew(string userId, string sessionId, TimeSpan leaseDuration, DateTimeOffset now, out MagmaEditSessionDescriptor? renewed)
+    public bool TryRenew(
+        string userId,
+        string sessionId,
+        TimeSpan leaseDuration,
+        DateTimeOffset now,
+        out MagmaEditSessionDescriptor? renewed)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(userId);
         ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
@@ -113,13 +118,20 @@ public sealed class MagmaEditSessionBroker
         string normalizedUserId = userId.Trim();
         string normalizedSessionId = sessionId.Trim();
 
-        if (!_sessions.TryGetValue(normalizedUserId, out MagmaEditSessionDescriptor? existing)
-            || !string.Equals(existing.SessionId, normalizedSessionId, StringComparison.Ordinal))
+        while (_sessions.TryGetValue(normalizedUserId, out MagmaEditSessionDescriptor? existing))
         {
-            return false;
+            if (!string.Equals(existing.SessionId, normalizedSessionId, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (_sessions.TryRemove(new KeyValuePair<string, MagmaEditSessionDescriptor>(normalizedUserId, existing)))
+            {
+                return true;
+            }
         }
 
-        return _sessions.TryRemove(new KeyValuePair<string, MagmaEditSessionDescriptor>(normalizedUserId, existing));
+        return false;
     }
 
     private static void ValidateRegistration(MagmaEditSessionRegistration registration)
