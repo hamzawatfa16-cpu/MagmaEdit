@@ -29,6 +29,7 @@ public sealed class EditorCommandRouter
                 EditorCommandKind.AddTrack => AddTrack(request),
                 EditorCommandKind.RemoveTrack => RemoveTrack(request),
                 EditorCommandKind.InsertClip => InsertClip(request),
+                EditorCommandKind.DuplicateClip => DuplicateClip(request),
                 EditorCommandKind.RemoveClip => RemoveClip(request),
                 EditorCommandKind.TrimClip => TrimClip(request),
                 EditorCommandKind.MoveClip => MoveClip(request),
@@ -82,6 +83,14 @@ public sealed class EditorCommandRouter
 
         TimelineClip clip = _gateway.InsertClip(trackId, mediaId, timelineStart, sourceIn, sourceOut);
         return Success("Clip inserted.", trackId: trackId, clipId: clip.Id, mediaId: mediaId);
+    }
+
+    private EditorCommandResult DuplicateClip(EditorCommandRequest request)
+    {
+        string trackId = Required(request.TrackId, nameof(request.TrackId));
+        string clipId = Required(request.ClipId, nameof(request.ClipId));
+        TimelineClip clip = _gateway.DuplicateClip(trackId, clipId);
+        return Success("Clip duplicated at the end of the track.", trackId: trackId, clipId: clip.Id, mediaId: clip.MediaId);
     }
 
     private EditorCommandResult RemoveClip(EditorCommandRequest request)
