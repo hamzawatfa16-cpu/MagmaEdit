@@ -39,23 +39,34 @@ public sealed class PluginHostTests
     {
         string dataRoot = Path.Combine(Path.GetTempPath(), "MagmaEditTests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dataRoot);
+        string previous = Environment.GetEnvironmentVariable("MAGMAEDIT_TEST_FAIL_PLUGIN_INITIALIZE") ?? string.Empty;
+        Environment.SetEnvironmentVariable("MAGMAEDIT_TEST_FAIL_PLUGIN_INITIALIZE", "1");
 
         var host = new MagmaEditPluginHost(dataRoot, new TestEditorCommands());
 
         try
         {
-            string assemblyPath = typeof(ThrowingInitializePlugin).Assembly.Location;
+            string assemblyPath = typeof(PluginHostTestsPlugin).Assembly.Location;
 
             InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(
                 async () => await host.LoadAsync(assemblyPath));
 
             Assert.Equal("Expected test initialization failure.", exception.Message);
-            string pluginDataDirectory = Path.Combine(dataRoot, "com.magmaedit.tests.throwing-initialize");
-            Assert.True(File.Exists(Path.Combine(pluginDataDirectory, "initialize-started.marker")));
-            Assert.True(File.Exists(Path.Combine(pluginDataDirectory, "shutdown-from-failed-initialize.marker")));
+            string pluginDataDirectory = Path.Combine(dataRoot, "com.magmaedit.tests.plugin");
+            Assert.True(File.Exists(Path.Combine(pluginDataDirectory, "initialize-failed.marker")));
+            Assert.True(File.Exists(Path.Combine(pluginDataDirectory, "shutdown-after-init-failure.marker")));
         }
         finally
         {
+            if (previous.Length == 0)
+            {
+                Environment.SetEnvironmentVariable("MAGMAEDIT_TEST_FAIL_PLUGIN_INITIALIZE", null);
+            }
+            else
+            {
+                Environment.SetEnvironmentVariable("MAGMAEDIT_TEST_FAIL_PLUGIN_INITIALIZE", previous);
+            }
+
             Directory.Delete(dataRoot, recursive: true);
         }
     }
@@ -336,6 +347,15 @@ public sealed class PluginHostTestsPlugin : IMagmaEditPlugin
     public ValueTask InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default)
     {
         _pluginDataDirectory = context.PluginDataDirectory;
+        if (string.Equals(
+                Environment.GetEnvironmentVariable("MAGMAEDIT_TEST_FAIL_PLUGIN_INITIALIZE"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            File.WriteAllText(Path.Combine(_pluginDataDirectory, "initialize-failed.marker"), "failed");
+            return ValueTask.FromException(new InvalidOperationException("Expected test initialization failure."));
+        }
+
         File.WriteAllText(Path.Combine(_pluginDataDirectory, "initialized.marker"), "initialized");
         return ValueTask.CompletedTask;
     }
@@ -345,6 +365,16 @@ public sealed class PluginHostTestsPlugin : IMagmaEditPlugin
         if (_pluginDataDirectory is null)
         {
             throw new InvalidOperationException("Plugin was not initialized.");
+        }
+
+        if (string.Equals(
+                Environment.GetEnvironmentVariable("MAGMAEDIT_TEST_FAIL_PLUGIN_INITIALIZE"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            File.WriteAllText(
+                Path.Combine(_pluginDataDirectory, "shutdown-after-init-failure.marker"),
+                "shutdown");
         }
 
         File.WriteAllText(Path.Combine(_pluginDataDirectory, "shutdown.marker"), "shutdown");
