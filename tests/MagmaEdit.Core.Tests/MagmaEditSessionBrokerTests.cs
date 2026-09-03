@@ -5,7 +5,7 @@ namespace MagmaEdit.Core.Tests;
 public sealed class MagmaEditSessionBrokerTests
 {
     [Fact]
-    public void RegisterAndResolve_ReturnsActiveSessionForSameUser()
+    public void RegisterAndResolveReturnsActiveSessionForSameUser()
     {
         var broker = new MagmaEditSessionBroker();
         DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -20,7 +20,7 @@ public sealed class MagmaEditSessionBrokerTests
     }
 
     [Fact]
-    public void Register_RejectsSecondActiveSessionForSameUser()
+    public void RegisterRejectsSecondActiveSessionForSameUser()
     {
         var broker = new MagmaEditSessionBroker();
         DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -31,7 +31,7 @@ public sealed class MagmaEditSessionBrokerTests
     }
 
     [Fact]
-    public void ExpiredSession_IsNotResolvedAndCanBeReplaced()
+    public void ExpiredSessionIsNotResolvedAndCanBeReplaced()
     {
         var broker = new MagmaEditSessionBroker();
         DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -48,7 +48,7 @@ public sealed class MagmaEditSessionBrokerTests
     }
 
     [Fact]
-    public void Renew_RejectsWrongUserOrSession()
+    public void RenewRejectsWrongUserOrSession()
     {
         var broker = new MagmaEditSessionBroker();
         DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -62,7 +62,7 @@ public sealed class MagmaEditSessionBrokerTests
     }
 
     [Fact]
-    public void Unregister_RequiresMatchingSessionId()
+    public void UnregisterRequiresMatchingSessionId()
     {
         var broker = new MagmaEditSessionBroker();
         DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -84,5 +84,11 @@ public sealed class MagmaEditSessionBrokerTests
             $"connection-{sessionId}",
             "ipc://MagmaEdit.LiveEditor.v1",
             leaseDuration ?? TimeSpan.FromMinutes(15),
-            new[] { "get_editor_state", "execute_editor_command" });
+            BrokerCapabilities);
+
+    private static readonly string[] BrokerCapabilities =
+    [
+        "get_editor_state",
+        "execute_editor_command"
+    ];
 }
