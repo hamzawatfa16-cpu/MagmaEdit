@@ -218,6 +218,108 @@ jobs:
             $process.Dispose()
           }
 
+      - name: Run MCP editor end-to-end flow
+        shell: pwsh
+        run: |
+          $publishDir = Join-Path $env:GITHUB_WORKSPACE 'artifacts\mcp'
+          $exe = Join-Path $publishDir 'MagmaEdit.McpServer.exe'
+          $projectRoot = Join-Path $env:RUNNER_TEMP 'MagmaEdit-McpE2E'
+          $projectPath = Join-Path $projectRoot 'ai-e2e.magmaedit.json'
+
+          if (Test-Path $projectRoot) {
+            Remove-Item $projectRoot -Recurse -Force
+          }
+          New-Item -ItemType Directory -Path $projectRoot -Force | Out-Null
+
+          @'
+{"id":"mcp-e2e-project","name":"MCP E2E","schemaVersion":1,"createdUtc":"2026-01-01T00:00:00+00:00","modifiedUtc":"2026-01-01T00:00:00+00:00","media":[]}
+'@ | Set-Content -Path $projectPath -Encoding utf8
+
+          $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+          $startInfo.FileName = $exe
+          $startInfo.WorkingDirectory = $publishDir
+          $startInfo.UseShellExecute = $false
+          $startInfo.CreateNoWindow = $true
+          $startInfo.RedirectStandardInput = $true
+          $startInfo.RedirectStandardOutput = $true
+          $startInfo.RedirectStandardError = $true
+          $startInfo.Environment['MAGMAEDIT_MCP_TRANSPORT'] = 'stdio'
+          $startInfo.Environment['MAGMAEDIT_PROJECT_PATH'] = $projectPath
+
+          $process = [System.Diagnostics.Process]::new()
+          $process.StartInfo = $startInfo
+
+          function Send-McpRequest([string] $json) {
+            $process.StandardInput.WriteLine($json)
+            $process.StandardInput.Flush()
+            $line = $process.StandardOutput.ReadLine()
+            if ([string]::IsNullOrWhiteSpace($line)) {
+              throw 'MCP server returned no response.'
+            }
+            $response = $line | ConvertFrom-Json
+            if ($response.error) {
+              throw "MCP request failed: $($response.error.message)"
+            }
+            return $response
+          }
+
+          try {
+            if (-not $process.Start()) {
+              throw 'Could not start the MCP server process.'
+            }
+
+            $initialize = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"MagmaEdit-CI","version":"1.0"}}}'
+            $initializeResponse = Send-McpRequest $initialize
+            if (-not $initializeResponse.result.protocolVersion) {
+              throw 'MCP initialize response did not contain a negotiated protocolVersion.'
+            }
+
+            $initialized = '{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}'
+            $process.StandardInput.WriteLine($initialized)
+            $process.StandardInput.Flush()
+
+            $toolsList = '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
+            $toolsResponse = Send-McpRequest $toolsList
+            $toolNames = @($toolsResponse.result.tools | ForEach-Object { $_.name })
+            foreach ($expectedTool in @('magmaedit.execute_editor_command', 'magmaedit.get_editor_state')) {
+              if ($toolNames -notcontains $expectedTool) {
+                throw "Expected MCP tool '$expectedTool' was not exposed."
+              }
+            }
+
+            $stateRequest = '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"magmaedit.get_editor_state","arguments":{}}}'
+            $stateResponse = Send-McpRequest $stateRequest
+            if (-not $stateResponse.result) {
+              throw 'MCP get_editor_state returned no result.'
+            }
+
+            $commandRequest = '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"magmaedit.execute_editor_command","arguments":{"request":{"command":0,"name":"AI E2E Track"}}}}'
+            $commandResponse = Send-McpRequest $commandRequest
+            if (-not $commandResponse.result) {
+              throw 'MCP execute_editor_command returned no result.'
+            }
+
+            $saved = Get-Content -Raw -Path $projectPath | ConvertFrom-Json
+            if ($saved.schemaVersion -ne 2) {
+              throw "MCP command did not persist the current project schema. Found schemaVersion=$($saved.schemaVersion)."
+            }
+            if (-not $saved.timeline -or @($saved.timeline.tracks).Count -ne 1) {
+              throw 'MCP command did not persist the expected timeline track.'
+            }
+            if ($saved.timeline.tracks[0].name -ne 'AI E2E Track') {
+              throw "Persisted track name was '$($saved.timeline.tracks[0].name)' instead of 'AI E2E Track'."
+            }
+
+            Write-Host "MCP E2E succeeded: initialize -> tools/list -> get_editor_state -> execute AddTrack -> persisted project state."
+          }
+          finally {
+            if (-not $process.HasExited) {
+              $process.Kill($true)
+              $process.WaitForExit()
+            }
+            $process.Dispose()
+          }
+
       - name: Publish Windows application
         shell: pwsh
         run: |
