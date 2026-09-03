@@ -70,7 +70,10 @@ public sealed class MagmaEditPluginHost
             string pluginDataDirectory = Path.Combine(_pluginDataRoot, plugin.Manifest.Id);
             Directory.CreateDirectory(pluginDataDirectory);
 
-            var context = new PluginContext(pluginDataDirectory, _editorCommands);
+            IPluginEditorCommands editorCommands = new CapabilityRestrictedEditorCommands(
+                plugin.Manifest.Capabilities,
+                _editorCommands);
+            var context = new PluginContext(pluginDataDirectory, editorCommands);
             await plugin.InitializeAsync(context, cancellationToken).ConfigureAwait(false);
             return new LoadedPlugin(loadContext, plugin, plugin.Manifest);
         }
@@ -102,6 +105,11 @@ public sealed class MagmaEditPluginHost
         ArgumentException.ThrowIfNullOrWhiteSpace(manifest.Version, nameof(manifest.Version));
         ArgumentException.ThrowIfNullOrWhiteSpace(manifest.Publisher, nameof(manifest.Publisher));
         ArgumentNullException.ThrowIfNull(manifest.Capabilities);
+
+        if (manifest.Capabilities.Count != manifest.Capabilities.Distinct().Count())
+        {
+            throw new ArgumentException("Plugin capabilities must not contain duplicates.", nameof(manifest));
+        }
     }
 
     private static void ValidateIdentifier(string value, string parameterName)
@@ -126,6 +134,37 @@ public sealed class MagmaEditPluginHost
         public string PluginDataDirectory { get; }
 
         public IPluginEditorCommands EditorCommands { get; }
+    }
+
+    private sealed class CapabilityRestrictedEditorCommands : IPluginEditorCommands
+    {
+        private readonly IReadOnlyList<PluginCapability> _capabilities;
+        private readonly IPluginEditorCommands _inner;
+
+        public CapabilityRestrictedEditorCommands(
+            IReadOnlyList<PluginCapability> capabilities,
+            IPluginEditorCommands inner)
+        {
+            _capabilities = capabilities;
+            _inner = inner;
+        }
+
+        public ValueTask<PluginCommandResult> ExecuteAsync(
+            string command,
+            IReadOnlyDictionary<string, string?> parameters,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(command);
+            ArgumentNullException.ThrowIfNull(parameters);
+
+            if (!_capabilities.Contains(PluginCapability.EditorCommands))
+            {
+                return ValueTask.FromResult(PluginCommandResult.Failure(
+                    "The plugin manifest does not declare the EditorCommands capability."));
+            }
+
+            return _inner.ExecuteAsync(command, parameters, cancellationToken);
+        }
     }
 
     private sealed class PluginLoadContext : AssemblyLoadContext
