@@ -1,8 +1,10 @@
+#pragma warning disable OPENAI001
+
 using OpenAI.Responses;
 
 namespace MagmaEdit.AiBridge;
 
-public sealed class OpenAiMcpEditingBridge
+public sealed partial class OpenAiMcpEditingBridge
 {
     private const string ReadOnlyTool = "magmaedit.get_editor_state";
     private const string EditingTool = "magmaedit.execute_editor_command";
@@ -53,23 +55,17 @@ public sealed class OpenAiMcpEditingBridge
             allowedTools: allowedTools,
             authorizationToken: _options.RemoteMcpBearerToken,
             toolCallApprovalPolicy: request.AllowMutations
-                ? new McpToolCallApprovalPolicy(GlobalMcpToolCallApprovalPolicy.NeverRequireApproval)
-                : new McpToolCallApprovalPolicy(GlobalMcpToolCallApprovalPolicy.AlwaysRequireApproval)));
+                ? GlobalMcpToolCallApprovalPolicy.NeverRequireApproval
+                : GlobalMcpToolCallApprovalPolicy.AlwaysRequireApproval));
 
         options.InputItems.Add(ResponseItem.CreateUserMessageItem(BuildPrompt(request)));
 
-        _logger.LogInformation(
-            "Starting AI edit request. MutationsEnabled={MutationsEnabled}, Model={Model}",
-            request.AllowMutations,
-            _options.OpenAiModel);
+        LogStarting(request.AllowMutations, _options.OpenAiModel);
 
         ResponseResult response = await _client.CreateResponseAsync(options, cancellationToken);
 
         string output = response.GetOutputText();
-        _logger.LogInformation(
-            "AI edit request completed. ResponseId={ResponseId}, OutputLength={OutputLength}",
-            response.Id,
-            output.Length);
+        LogCompleted(response.Id, output.Length);
 
         return new AiBridgeResult(
             response.Id,
@@ -86,6 +82,18 @@ public sealed class OpenAiMcpEditingBridge
             ? $"{policy}\n\nThe user has explicitly enabled editing actions for this request.\n\nUser request:\n{request.Prompt}"
             : $"{policy}\n\nThis request is read-only. Do not perform mutations. You may inspect editor state and explain what would need to change.\n\nUser request:\n{request.Prompt}";
     }
+
+    [LoggerMessage(
+        EventId = 1000,
+        Level = LogLevel.Information,
+        Message = "Starting AI edit request. MutationsEnabled={MutationsEnabled}, Model={Model}")]
+    private partial void LogStarting(bool mutationsEnabled, string model);
+
+    [LoggerMessage(
+        EventId = 1001,
+        Level = LogLevel.Information,
+        Message = "AI edit request completed. ResponseId={ResponseId}, OutputLength={OutputLength}")]
+    private partial void LogCompleted(string responseId, int outputLength);
 }
 
 public sealed record AiEditRequest(
