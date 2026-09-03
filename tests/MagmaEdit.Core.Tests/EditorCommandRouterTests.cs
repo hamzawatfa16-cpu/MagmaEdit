@@ -39,6 +39,54 @@ public sealed class EditorCommandRouterTests
     }
 
     [Fact]
+    public void CrossTrackMoveIsExposedThroughAutomation()
+    {
+        ProjectDocument project = ProjectDocument.Create("Cross Track Router Test");
+        EditorCommandGateway gateway = new(project);
+        TimelineTrack sourceTrack = gateway.AddTrack("Video 1");
+        TimelineTrack destinationTrack = gateway.AddTrack("Video 2");
+        TimelineClip clip = gateway.InsertClip(
+            sourceTrack.Id,
+            "media-1",
+            EditTime.Zero,
+            EditTime.Zero,
+            EditTime.FromSeconds(4));
+        EditorCommandRouter router = new(gateway);
+
+        EditorCommandResult result = router.Execute(new(
+            EditorCommandKind.MoveClipToTrack,
+            TrackId: sourceTrack.Id,
+            DestinationTrackId: destinationTrack.Id,
+            ClipId: clip.Id,
+            TimelinePositionTicks: EditTime.FromSeconds(5).Ticks.ToString(CultureInfo.InvariantCulture)));
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(destinationTrack.Id, result.TrackId);
+        Assert.Equal(clip.Id, result.ClipId);
+        Assert.Empty(sourceTrack.Clips);
+        Assert.Single(destinationTrack.Clips);
+        Assert.Equal(EditTime.FromSeconds(5), destinationTrack.Clips[0].TimelineStart);
+    }
+
+    [Fact]
+    public void CrossTrackMoveRequiresDestinationTrack()
+    {
+        ProjectDocument project = ProjectDocument.Create("Cross Track Validation Test");
+        EditorCommandGateway gateway = new(project);
+        TimelineTrack sourceTrack = gateway.AddTrack("Video 1");
+        EditorCommandRouter router = new(gateway);
+
+        EditorCommandResult result = router.Execute(new(
+            EditorCommandKind.MoveClipToTrack,
+            TrackId: sourceTrack.Id,
+            ClipId: "clip",
+            TimelinePositionTicks: "0"));
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("DestinationTrackId", result.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void InvalidRequestReturnsStructuredFailureWithoutChangingHistory()
     {
         ProjectDocument project = ProjectDocument.Create("Router Test");
