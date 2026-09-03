@@ -30,7 +30,11 @@ public sealed partial class OpenAiMcpEditingBridge
         ArgumentException.ThrowIfNullOrWhiteSpace(request.Prompt);
 
         if (request.Prompt.Length > 12000)
-            throw new ArgumentException("Prompt is too large. Maximum length is 12000 characters.", nameof(request.Prompt));
+        {
+            throw new ArgumentException(
+                "Prompt is too large. Maximum length is 12000 characters.",
+                nameof(request));
+        }
 
         if (request.AllowMutations && !_options.AllowMutations)
         {
