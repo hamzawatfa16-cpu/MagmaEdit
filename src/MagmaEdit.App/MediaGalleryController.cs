@@ -113,7 +113,7 @@ public sealed class MediaGalleryController : IDisposable
             mainWindow.SelectMedia,
             mainWindow.SaveProjectForExport,
             mainWindow.RemoveMediaFromGallery,
-            publishCommands.SetPublished,
+            asset => publishCommands.SetPublished(asset, !asset.IsPublished),
             mainWindow.SetStatusForGallery);
     }
 
