@@ -185,6 +185,38 @@ public sealed class PluginHostTests
     }
 
     [Fact]
+    public async Task ConcurrentManagerLoadsAllowOnlyOnePluginInstance()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "MagmaEditTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+
+        var manager = new PluginManager(Path.Combine(root, "data"), new TestEditorCommands());
+        try
+        {
+            string assemblyPath = typeof(PluginHostTestsPlugin).Assembly.Location;
+            PluginDescriptor descriptor = new(
+                assemblyPath,
+                MagmaEditPluginHost.InspectManifest(assemblyPath));
+
+            Task<LoadedPlugin> first = manager.LoadAsync(descriptor).AsTask();
+            Task<LoadedPlugin> second = manager.LoadAsync(descriptor).AsTask();
+            LoadedPlugin[] successful = await Task.WhenAll(
+                first.ContinueWith(task => task.Status == TaskStatus.RanToCompletion ? task.Result : null),
+                second.ContinueWith(task => task.Status == TaskStatus.RanToCompletion ? task.Result : null));
+
+            Assert.Single(successful.OfType<LoadedPlugin>());
+            Assert.Equal(["com.magmaedit.tests.plugin"], manager.LoadedPluginIds);
+
+            await manager.UnloadAsync("com.magmaedit.tests.plugin");
+        }
+        finally
+        {
+            await manager.DisposeAsync();
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ManagerContinuesDisposingPluginsAfterOneShutdownFailure()
     {
         string root = Path.Combine(Path.GetTempPath(), "MagmaEditTests", Guid.NewGuid().ToString("N"));
