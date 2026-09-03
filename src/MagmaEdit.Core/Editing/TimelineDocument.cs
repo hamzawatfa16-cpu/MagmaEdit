@@ -155,6 +155,17 @@ public sealed class TimelineEditor
         Sort(track);
     }
 
+    public void MoveClip(string trackId, string clipId, EditTime timelineStart)
+    {
+        TimelineTrack track = _timeline.GetTrack(trackId);
+        TimelineClip clip = FindClip(track, clipId);
+        TimelineClip candidate = clip.Clone();
+        candidate.TimelineStart = timelineStart;
+        EnsureNoOverlap(track, candidate, clip.Id);
+        clip.TimelineStart = timelineStart;
+        Sort(track);
+    }
+
     public (TimelineClip Left, TimelineClip Right) SplitClip(string trackId, string clipId, EditTime timelinePosition)
     {
         TimelineTrack track = _timeline.GetTrack(trackId);
