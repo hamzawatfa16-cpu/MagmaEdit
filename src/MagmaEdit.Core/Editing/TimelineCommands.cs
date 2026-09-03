@@ -27,6 +27,48 @@ public sealed class AddTimelineTrackCommand : IEditCommand
     }
 }
 
+public sealed class RemoveTimelineTrackCommand : IEditCommand
+{
+    private readonly TimelineDocument _timeline;
+    private readonly string _trackId;
+    private readonly TimelineTrack _track;
+    private readonly int _index;
+
+    public RemoveTimelineTrackCommand(TimelineDocument timeline, string trackId)
+    {
+        _timeline = timeline ?? throw new ArgumentNullException(nameof(timeline));
+        ArgumentException.ThrowIfNullOrWhiteSpace(trackId);
+
+        int index = timeline.Tracks.FindIndex(track => string.Equals(track.Id, trackId, StringComparison.Ordinal));
+        if (index < 0)
+            throw new KeyNotFoundException($"Timeline track '{trackId}' does not exist.");
+
+        _trackId = trackId;
+        _index = index;
+        _track = timeline.Tracks[index];
+    }
+
+    public string Label => "Remove track";
+
+    public TimelineTrack Track => _track;
+
+    public void Apply()
+    {
+        int currentIndex = _timeline.Tracks.FindIndex(track => string.Equals(track.Id, _trackId, StringComparison.Ordinal));
+        if (currentIndex >= 0)
+            _timeline.RemoveTrack(_trackId);
+    }
+
+    public void Revert()
+    {
+        if (_timeline.Tracks.Any(track => string.Equals(track.Id, _trackId, StringComparison.Ordinal)))
+            return;
+
+        int insertionIndex = Math.Min(_index, _timeline.Tracks.Count);
+        _timeline.Tracks.Insert(insertionIndex, _track);
+    }
+}
+
 public sealed class InsertTimelineClipCommand : IEditCommand
 {
     private readonly TimelineEditor _editor;
