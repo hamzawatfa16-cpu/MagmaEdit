@@ -39,6 +39,10 @@ public static class EditorCommandCatalog
                     nameof(EditorCommandRequest.SourceInTicks),
                     nameof(EditorCommandRequest.SourceOutTicks)
                 ]),
+            [EditorCommandKind.DuplicateClip] = new(
+                EditorCommandKind.DuplicateClip,
+                EditorCommandCapability.TimelineEditing,
+                [nameof(EditorCommandRequest.TrackId), nameof(EditorCommandRequest.ClipId)]),
             [EditorCommandKind.RemoveClip] = new(
                 EditorCommandKind.RemoveClip,
                 EditorCommandCapability.TimelineEditing,
