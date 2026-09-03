@@ -1,6 +1,5 @@
 using System.Globalization;
 using MagmaEdit.Core.Editing;
-using MagmaEdit.Core.Projects;
 
 namespace MagmaEdit.Integration;
 
@@ -129,7 +128,7 @@ public sealed class EditorCommandRouter
         string mediaId = Required(request.MediaId, nameof(request.MediaId));
         if (request.IsPublished is not { } isPublished)
         {
-            throw new ArgumentException("A publication state is required.", nameof(request.IsPublished));
+            throw new ArgumentException("A publication state is required.", nameof(request));
         }
 
         _gateway.SetMediaPublished(mediaId, isPublished);
