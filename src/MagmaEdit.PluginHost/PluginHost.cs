@@ -29,10 +29,12 @@ public sealed class MagmaEditPluginHost
             throw new FileNotFoundException("Plugin assembly was not found.", fullAssemblyPath);
         }
 
+        byte[] assemblyBytes = File.ReadAllBytes(fullAssemblyPath);
         var loadContext = new PluginLoadContext(fullAssemblyPath);
         try
         {
-            Assembly assembly = loadContext.LoadFromAssemblyPath(fullAssemblyPath);
+            using var assemblyStream = new MemoryStream(assemblyBytes, writable: false);
+            Assembly assembly = loadContext.LoadFromStream(assemblyStream);
             Type pluginType = FindPluginType(assembly);
             var plugin = (IMagmaEditPlugin)Activator.CreateInstance(pluginType)!;
             ValidateManifest(plugin.Manifest);
