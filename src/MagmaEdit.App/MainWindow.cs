@@ -25,6 +25,7 @@ public sealed class MainWindow : Window
     private readonly WorkspaceLayout _workspace;
     private readonly ProjectStore _projectStore;
     private readonly ProjectSession _projectSession;
+    private readonly IMediaProbeService _mediaProbeService;
     private ProjectDocument _project;
     private string _projectPath;
     private readonly StackPanel _mediaList;
@@ -54,8 +55,10 @@ public sealed class MainWindow : Window
     private TimelineTrack? _selectedTrack;
     private TimelineClip? _selectedClip;
 
-    public MainWindow()
+    public MainWindow(IMediaProbeService mediaProbeService)
     {
+        ArgumentNullException.ThrowIfNull(mediaProbeService);
+
         Title = "MagmaEdit";
         Width = 1280;
         Height = 800;
@@ -67,6 +70,7 @@ public sealed class MainWindow : Window
         new WorkspaceManager(_workspace).EnsureCreated();
         _projectStore = new ProjectStore(_workspace);
         _projectSession = new ProjectSession(_workspace);
+        _mediaProbeService = mediaProbeService;
         (_project, _projectPath) = LoadOrCreateProject();
 
         _mediaList = new StackPanel { Spacing = 6 };
@@ -614,7 +618,7 @@ public sealed class MainWindow : Window
             int alreadyImported = 0;
             int failed = 0;
             MediaAsset? lastImportedAsset = null;
-            var importer = new MediaImportService(_workspace);
+            var importer = new MediaImportService(_workspace, _mediaProbeService);
 
             foreach (IStorageFile file in files)
             {
