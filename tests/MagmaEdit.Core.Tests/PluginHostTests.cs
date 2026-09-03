@@ -35,6 +35,32 @@ public sealed class PluginHostTests
     }
 
     [Fact]
+    public async Task ShutdownRunsWhenInitializationFailsAfterPluginStarts()
+    {
+        string dataRoot = Path.Combine(Path.GetTempPath(), "MagmaEditTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dataRoot);
+
+        var host = new MagmaEditPluginHost(dataRoot, new TestEditorCommands());
+
+        try
+        {
+            string assemblyPath = typeof(ThrowingInitializePlugin).Assembly.Location;
+
+            InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(
+                async () => await host.LoadAsync(assemblyPath));
+
+            Assert.Equal("Expected test initialization failure.", exception.Message);
+            string pluginDataDirectory = Path.Combine(dataRoot, "com.magmaedit.tests.throwing-initialize");
+            Assert.True(File.Exists(Path.Combine(pluginDataDirectory, "initialize-started.marker")));
+            Assert.True(File.Exists(Path.Combine(pluginDataDirectory, "shutdown-from-failed-initialize.marker")));
+        }
+        finally
+        {
+            Directory.Delete(dataRoot, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task DeniesEditorCommandsWhenCapabilityIsMissing()
     {
         var commands = new TestEditorCommands();
