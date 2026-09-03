@@ -12,6 +12,23 @@ public interface IMagmaEditPlugin
 public interface IPluginContext
 {
     string PluginDataDirectory { get; }
+
+    IPluginEditorCommands EditorCommands { get; }
+}
+
+public interface IPluginEditorCommands
+{
+    ValueTask<PluginCommandResult> ExecuteAsync(
+        string command,
+        IReadOnlyDictionary<string, string?> parameters,
+        CancellationToken cancellationToken = default);
+}
+
+public sealed record PluginCommandResult(bool Succeeded, string Message)
+{
+    public static PluginCommandResult Success(string message = "Command completed.") => new(true, message);
+
+    public static PluginCommandResult Failure(string message) => new(false, message);
 }
 
 public sealed record PluginManifest(
