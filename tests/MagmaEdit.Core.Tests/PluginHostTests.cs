@@ -33,6 +33,29 @@ public sealed class PluginHostTests
         }
     }
 
+    [Fact]
+    public async Task UnloadsPluginWhenShutdownFails()
+    {
+        string dataRoot = Path.Combine(Path.GetTempPath(), "MagmaEditTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dataRoot);
+
+        var commands = new TestEditorCommands();
+        var host = new MagmaEditPluginHost(dataRoot, commands);
+
+        try
+        {
+            string assemblyPath = typeof(ThrowingShutdownPlugin).Assembly.Location;
+            LoadedPlugin loaded = await host.LoadAsync(assemblyPath);
+
+            await Assert.ThrowsAsync<InvalidOperationException>(async () => await loaded.DisposeAsync());
+            await loaded.DisposeAsync();
+        }
+        finally
+        {
+            Directory.Delete(dataRoot, recursive: true);
+        }
+    }
+
     private sealed class TestEditorCommands : IPluginEditorCommands
     {
         public ValueTask<PluginCommandResult> ExecuteAsync(
@@ -71,4 +94,20 @@ public sealed class PluginHostTestsPlugin : IMagmaEditPlugin
         File.WriteAllText(Path.Combine(_pluginDataDirectory, "shutdown.marker"), "shutdown");
         return ValueTask.CompletedTask;
     }
+}
+
+public sealed class ThrowingShutdownPlugin : IMagmaEditPlugin
+{
+    public PluginManifest Manifest { get; } = new(
+        "com.magmaedit.tests.throwing-shutdown",
+        "MagmaEdit Throwing Shutdown Test Plugin",
+        "1.0.0",
+        "MagmaEdit Tests",
+        [PluginCapability.EditorCommands]);
+
+    public ValueTask InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default) =>
+        ValueTask.CompletedTask;
+
+    public ValueTask ShutdownAsync(CancellationToken cancellationToken = default) =>
+        ValueTask.FromException(new InvalidOperationException("Expected test shutdown failure."));
 }
