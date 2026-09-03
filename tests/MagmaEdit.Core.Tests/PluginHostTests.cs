@@ -63,10 +63,6 @@ public sealed class PluginHostTests
         string pluginRoot = Path.Combine(Path.GetTempPath(), "MagmaEditTests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(pluginRoot);
 
-        var commands = new TestEditorCommands();
-        var host = new MagmaEditPluginHost(Path.Combine(pluginRoot, "data"), commands);
-        var catalog = new PluginCatalog(host);
-
         try
         {
             string validAssembly = typeof(ThrowingShutdownPlugin).Assembly.Location;
@@ -81,7 +77,7 @@ public sealed class PluginHostTests
             File.Copy(validAssembly, duplicatePlugin);
             File.Copy(typeof(MagmaEditPluginHost).Assembly.Location, invalidAssembly);
 
-            PluginDiscoveryResult result = catalog.Discover(pluginRoot);
+            PluginDiscoveryResult result = PluginCatalog.Discover(pluginRoot);
 
             Assert.Single(result.Plugins);
             Assert.Equal("com.magmaedit.tests.throwing-shutdown", result.Plugins[0].Manifest.Id);
