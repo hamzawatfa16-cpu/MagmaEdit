@@ -10,12 +10,9 @@ public sealed record PluginDiscoveryResult(
 
 public sealed class PluginCatalog
 {
-    private readonly MagmaEditPluginHost _host;
-
     public PluginCatalog(MagmaEditPluginHost host)
     {
         ArgumentNullException.ThrowIfNull(host);
-        _host = host;
     }
 
     public PluginDiscoveryResult Discover(string pluginRoot)
@@ -40,7 +37,7 @@ public sealed class PluginCatalog
         {
             try
             {
-                MagmaEdit.Plugin.Abstractions.PluginManifest manifest = _host.InspectManifest(assemblyPath);
+                MagmaEdit.Plugin.Abstractions.PluginManifest manifest = MagmaEditPluginHost.InspectManifest(assemblyPath);
                 if (!knownIds.Add(manifest.Id))
                 {
                     issues.Add(new PluginDiscoveryIssue(
