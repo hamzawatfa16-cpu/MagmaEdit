@@ -10,12 +10,7 @@ public sealed record PluginDiscoveryResult(
 
 public sealed class PluginCatalog
 {
-    public PluginCatalog(MagmaEditPluginHost host)
-    {
-        ArgumentNullException.ThrowIfNull(host);
-    }
-
-    public PluginDiscoveryResult Discover(string pluginRoot)
+    public static PluginDiscoveryResult Discover(string pluginRoot)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(pluginRoot);
 
