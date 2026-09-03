@@ -7,6 +7,7 @@
     <Project Path="src/MagmaEdit.PluginHost/MagmaEdit.PluginHost.csproj" />
     <Project Path="src/MagmaEdit.Media.Sprocket/MagmaEdit.Media.Sprocket.csproj" />
     <Project Path="src/MagmaEdit.McpServer/MagmaEdit.McpServer.csproj" />
+    <Project Path="src/MagmaEdit.AiBridge/MagmaEdit.AiBridge.csproj" />
     <Project Path="src/MagmaEdit.App/MagmaEdit.App.csproj" />
     <Project Path="third_party/sprocket/src/Sprocket.Core/Sprocket.Core.csproj" />
     <Project Path="third_party/sprocket/src/Sprocket.Media/Sprocket.Media.csproj" />
