@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net;
 using System.Text;
 using Supabase.Gotrue;
 using Supabase.Gotrue.Constants;
