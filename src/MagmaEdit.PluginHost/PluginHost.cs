@@ -60,6 +60,7 @@ public sealed class MagmaEditPluginHost
         }
 
         var loadContext = new PluginLoadContext(fullAssemblyPath);
+        IMagmaEditPlugin? plugin = null;
         try
         {
             Assembly assembly = loadContext.LoadFromAssemblyPath(fullAssemblyPath);
@@ -67,7 +68,7 @@ public sealed class MagmaEditPluginHost
             PluginManifest declaredManifest = GetDeclaredManifest(pluginType);
             ValidateManifest(declaredManifest);
 
-            var plugin = (IMagmaEditPlugin)Activator.CreateInstance(pluginType)!;
+            plugin = (IMagmaEditPlugin)Activator.CreateInstance(pluginType)!;
             ValidateManifest(plugin.Manifest);
             ValidateManifestConsistency(declaredManifest, plugin.Manifest);
 
@@ -83,6 +84,18 @@ public sealed class MagmaEditPluginHost
         }
         catch
         {
+            if (plugin is not null)
+            {
+                try
+                {
+                    await plugin.ShutdownAsync(CancellationToken.None).ConfigureAwait(false);
+                }
+                catch
+                {
+                    // Preserve the original initialization/load exception.
+                }
+            }
+
             loadContext.Unload();
             throw;
         }
