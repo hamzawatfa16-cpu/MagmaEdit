@@ -113,6 +113,111 @@ jobs:
       - name: Test
         run: dotnet test MagmaEdit.slnx --configuration Release --no-build --verbosity normal
 
+      - name: Publish MCP server
+        shell: pwsh
+        run: |
+          $publishDir = Join-Path $env:GITHUB_WORKSPACE 'artifacts\mcp'
+          if (Test-Path $publishDir) {
+            Remove-Item $publishDir -Recurse -Force
+          }
+
+          dotnet publish src/MagmaEdit.McpServer/MagmaEdit.McpServer.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            --no-restore `
+            --output $publishDir
+          if ($LASTEXITCODE -ne 0) {
+            throw "MCP server publish failed with exit code $LASTEXITCODE."
+          }
+
+          $exe = Join-Path $publishDir 'MagmaEdit.McpServer.exe'
+          if (-not (Test-Path $exe)) {
+            throw "The MCP publish output does not contain MagmaEdit.McpServer.exe."
+          }
+
+      - name: Smoke test MCP STDIO handshake
+        shell: pwsh
+        run: |
+          $publishDir = Join-Path $env:GITHUB_WORKSPACE 'artifacts\mcp'
+          $exe = Join-Path $publishDir 'MagmaEdit.McpServer.exe'
+
+          $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+          $startInfo.FileName = $exe
+          $startInfo.WorkingDirectory = $publishDir
+          $startInfo.UseShellExecute = $false
+          $startInfo.CreateNoWindow = $true
+          $startInfo.RedirectStandardInput = $true
+          $startInfo.RedirectStandardOutput = $true
+          $startInfo.RedirectStandardError = $true
+          $startInfo.Environment['MAGMAEDIT_MCP_TRANSPORT'] = 'stdio'
+
+          $process = [System.Diagnostics.Process]::new()
+          $process.StartInfo = $startInfo
+
+          try {
+            if (-not $process.Start()) {
+              throw 'Could not start the MCP server process.'
+            }
+
+            $initialize = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"MagmaEdit-CI","version":"1.0"}}}'
+            $process.StandardInput.WriteLine($initialize)
+            $process.StandardInput.Flush()
+
+            $initializeLine = $process.StandardOutput.ReadLine()
+            if ([string]::IsNullOrWhiteSpace($initializeLine)) {
+              $stderr = $process.StandardError.ReadToEnd()
+              throw "MCP server returned no initialize response. stderr: $stderr"
+            }
+
+            $initializeResponse = $initializeLine | ConvertFrom-Json
+            if ($initializeResponse.error) {
+              throw "MCP initialize failed: $($initializeResponse.error.message)"
+            }
+            if (-not $initializeResponse.result.protocolVersion) {
+              throw 'MCP initialize response did not contain a negotiated protocolVersion.'
+            }
+
+            $initialized = '{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}'
+            $process.StandardInput.WriteLine($initialized)
+            $process.StandardInput.Flush()
+
+            $toolsList = '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
+            $process.StandardInput.WriteLine($toolsList)
+            $process.StandardInput.Flush()
+
+            $toolsLine = $process.StandardOutput.ReadLine()
+            if ([string]::IsNullOrWhiteSpace($toolsLine)) {
+              throw 'MCP server returned no tools/list response.'
+            }
+
+            $toolsResponse = $toolsLine | ConvertFrom-Json
+            if ($toolsResponse.error) {
+              throw "MCP tools/list failed: $($toolsResponse.error.message)"
+            }
+
+            $toolNames = @($toolsResponse.result.tools | ForEach-Object { $_.name })
+            $expectedTools = @(
+              'magmaedit.execute_editor_command',
+              'magmaedit.get_editor_state'
+            )
+            foreach ($expectedTool in $expectedTools) {
+              if ($toolNames -notcontains $expectedTool) {
+                throw "MCP tools/list did not expose expected tool '$expectedTool'."
+              }
+            }
+
+            Write-Host "MCP STDIO handshake succeeded with protocol $($initializeResponse.result.protocolVersion)."
+            Write-Host "MCP tools exposed: $($toolNames -join ', ')"
+          }
+          finally {
+            if (-not $process.HasExited) {
+              $process.Kill($true)
+              $process.WaitForExit()
+            }
+            $process.Dispose()
+          }
+
       - name: Publish Windows application
         shell: pwsh
         run: |
