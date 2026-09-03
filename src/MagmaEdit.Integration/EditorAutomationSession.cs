@@ -9,6 +9,7 @@ public sealed class EditorAutomationSession
 {
     private readonly ProjectStore _store;
     private readonly string _projectPath;
+    private readonly EditorCommandGateway _gateway;
     private readonly AuthorizedEditorCommandRouter _router;
 
     public EditorAutomationSession(
@@ -28,8 +29,8 @@ public sealed class EditorAutomationSession
         }
 
         _store = new ProjectStore(WorkspaceLayout.Create(projectDirectory));
-        var gateway = new EditorCommandGateway(project);
-        _router = new AuthorizedEditorCommandRouter(new EditorCommandRouter(gateway));
+        _gateway = new EditorCommandGateway(project);
+        _router = new AuthorizedEditorCommandRouter(new EditorCommandRouter(_gateway));
         Project = project;
         Client = client;
     }
@@ -63,5 +64,54 @@ public sealed class EditorAutomationSession
         }
 
         return result;
+    }
+
+    public EditorProjectState GetState()
+    {
+        IReadOnlyList<EditorMediaState> media = Project.Media
+            .OrderBy(asset => asset.Id, StringComparer.Ordinal)
+            .Select(asset => new EditorMediaState(
+                asset.Id,
+                asset.FileName,
+                asset.SourcePath,
+                asset.LibraryPath,
+                asset.IsPublished,
+                asset.Metadata?.DurationSeconds,
+                asset.Metadata?.Width,
+                asset.Metadata?.Height,
+                asset.Metadata?.FrameRate))
+            .ToArray();
+
+        IReadOnlyList<EditorTrackState> tracks = Project.Timeline.Tracks
+            .OrderBy(track => track.Id, StringComparer.Ordinal)
+            .Select(track => new EditorTrackState(
+                track.Id,
+                track.Name,
+                track.Clips
+                    .OrderBy(clip => clip.TimelineStart)
+                    .ThenBy(clip => clip.Id, StringComparer.Ordinal)
+                    .Select(clip => new EditorClipState(
+                        clip.Id,
+                        clip.MediaId,
+                        clip.TimelineStart.Ticks,
+                        clip.SourceIn.Ticks,
+                        clip.SourceOut.Ticks,
+                        clip.Duration.Ticks))
+                    .ToArray()))
+            .ToArray();
+
+        return new EditorProjectState(
+            Project.Id,
+            Project.Name,
+            Project.SchemaVersion,
+            Project.Timeline.Width,
+            Project.Timeline.Height,
+            Project.Timeline.FrameRateNumerator,
+            Project.Timeline.FrameRateDenominator,
+            media.Count,
+            media,
+            tracks,
+            _gateway.History.UndoCount,
+            _gateway.History.RedoCount);
     }
 }
