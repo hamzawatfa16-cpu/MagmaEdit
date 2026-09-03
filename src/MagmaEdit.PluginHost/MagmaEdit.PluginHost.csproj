@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>MagmaEdit.PluginHost</RootNamespace>
+    <AssemblyName>MagmaEdit.PluginHost</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MagmaEdit.Plugin.Abstractions\MagmaEdit.Plugin.Abstractions.csproj" />
+  </ItemGroup>
+</Project>
