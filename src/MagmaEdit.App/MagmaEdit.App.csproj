@@ -12,14 +12,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.1.1" />
     <PackageReference Include="Avalonia.Desktop" Version="12.1.1" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.1" />
   </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\MagmaEdit.Core\MagmaEdit.Core.csproj" />
+    <ProjectReference Include="..\MagmaEdit.Media.Sprocket\MagmaEdit.Media.Sprocket.csproj" />
   </ItemGroup>
 </Project>

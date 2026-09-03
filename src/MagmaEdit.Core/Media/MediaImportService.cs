@@ -9,7 +9,7 @@ public sealed record MediaAsset(
     string SourcePath,
     string LibraryPath)
 {
-    /// <summary>Real media facts captured by Sprocket/FFmpeg when this asset was imported.</summary>
+    /// <summary>Real media facts captured by the configured media probe implementation when this asset was imported.</summary>
     public MediaProbeResult? Metadata { get; init; }
 
     /// <summary>Whether the user has marked this video as published.</summary>
@@ -38,10 +38,12 @@ public sealed record MediaAsset(
 public sealed class MediaImportService
 {
     private readonly WorkspaceLayout _workspace;
+    private readonly IMediaProbeService _probeService;
 
-    public MediaImportService(WorkspaceLayout workspace)
+    public MediaImportService(WorkspaceLayout workspace, IMediaProbeService probeService)
     {
         _workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
+        _probeService = probeService ?? throw new ArgumentNullException(nameof(probeService));
     }
 
     public MediaAsset Import(string sourcePath)
@@ -65,7 +67,7 @@ public sealed class MediaImportService
 
         try
         {
-            MediaProbeResult metadata = MediaProbeService.Probe(destination);
+            MediaProbeResult metadata = _probeService.Probe(destination);
             if (!metadata.HasVideo)
             {
                 throw new InvalidDataException("The selected file does not contain a usable video stream.");

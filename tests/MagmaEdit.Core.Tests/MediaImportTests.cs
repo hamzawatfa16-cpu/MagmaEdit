@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using MagmaEdit.Core.Media;
 using MagmaEdit.Core.Workspace;
+using MagmaEdit.Media.Sprocket;
 
 namespace MagmaEdit.Core.Tests;
 
@@ -72,7 +73,7 @@ public sealed class MediaImportTests
             Directory.CreateDirectory(root);
             byte[] content = CreateRealMp4(source, "testsrc2=size=90x160:rate=30:duration=1");
 
-            MediaAsset asset = new MediaImportService(layout).Import(source);
+            MediaAsset asset = new MediaImportService(layout, new SprocketMediaProbeService()).Import(source);
 
             Assert.True(File.Exists(source));
             Assert.True(File.Exists(asset.LibraryPath));
@@ -103,7 +104,7 @@ public sealed class MediaImportTests
             Directory.CreateDirectory(layout.Media);
             File.WriteAllBytes(Path.Combine(layout.Media, "clip.mp4"), [9, 9, 9]);
 
-            MediaAsset asset = new MediaImportService(layout).Import(source);
+            MediaAsset asset = new MediaImportService(layout, new SprocketMediaProbeService()).Import(source);
 
             Assert.Equal("clip (2).mp4", asset.FileName);
             Assert.Equal([9, 9, 9], File.ReadAllBytes(Path.Combine(layout.Media, "clip.mp4")));
@@ -128,7 +129,7 @@ public sealed class MediaImportTests
             CreateRealMp4(source, "testsrc2=size=160x90:rate=30:duration=1");
 
             InvalidDataException exception = Assert.Throws<InvalidDataException>(() =>
-                new MediaImportService(layout).Import(source));
+                new MediaImportService(layout, new SprocketMediaProbeService()).Import(source));
 
             Assert.Contains("must be 9:16", exception.Message, StringComparison.Ordinal);
             Assert.False(File.Exists(Path.Combine(layout.Media, "landscape.mp4")));
@@ -150,7 +151,7 @@ public sealed class MediaImportTests
             Directory.CreateDirectory(root);
 
             Assert.Throws<FileNotFoundException>(() =>
-                new MediaImportService(layout).Import(Path.Combine(root, "missing.mp4")));
+                new MediaImportService(layout, new SprocketMediaProbeService()).Import(Path.Combine(root, "missing.mp4")));
         }
         finally
         {
@@ -171,7 +172,7 @@ public sealed class MediaImportTests
             File.WriteAllText(source, "not an image format");
 
             Assert.Throws<NotSupportedException>(() =>
-                new MediaImportService(layout).Import(source));
+                new MediaImportService(layout, new SprocketMediaProbeService()).Import(source));
         }
         finally
         {
@@ -192,7 +193,7 @@ public sealed class MediaImportTests
             File.WriteAllText(source, "not a video");
 
             Assert.Throws<NotSupportedException>(() =>
-                new MediaImportService(layout).Import(source));
+                new MediaImportService(layout, new SprocketMediaProbeService()).Import(source));
         }
         finally
         {

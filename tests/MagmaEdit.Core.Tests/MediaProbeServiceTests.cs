@@ -1,21 +1,24 @@
 using MagmaEdit.Core.Media;
+using MagmaEdit.Media.Sprocket;
 
 namespace MagmaEdit.Core.Tests;
 
 public sealed class MediaProbeServiceTests
 {
+    private readonly IMediaProbeService _probeService = new SprocketMediaProbeService();
+
     [Fact]
     public void ProbeRejectsMissingFile()
     {
         string path = Path.Combine(Path.GetTempPath(), $"MagmaEdit-missing-{Guid.NewGuid():N}.mp4");
 
-        Assert.Throws<FileNotFoundException>(() => MediaProbeService.Probe(path));
+        Assert.Throws<FileNotFoundException>(() => _probeService.Probe(path));
     }
 
     [Fact]
     public void ProbeRejectsEmptyPath()
     {
-        Assert.Throws<ArgumentException>(() => MediaProbeService.Probe(string.Empty));
+        Assert.Throws<ArgumentException>(() => _probeService.Probe(string.Empty));
     }
 
     [Fact]
@@ -35,7 +38,7 @@ public sealed class MediaProbeServiceTests
                 0, 0, 0, 0
             ]);
 
-            InvalidDataException exception = Assert.Throws<InvalidDataException>(() => MediaProbeService.Probe(path));
+            InvalidDataException exception = Assert.Throws<InvalidDataException>(() => _probeService.Probe(path));
             Assert.Contains("could not be decoded or probed", exception.Message, StringComparison.OrdinalIgnoreCase);
         }
         finally

@@ -2,6 +2,8 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Themes.Fluent;
+using MagmaEdit.Core.Media;
+using MagmaEdit.Media.Sprocket;
 
 namespace MagmaEdit.App;
 
@@ -16,7 +18,8 @@ public sealed class App : Application
     {
         if (ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
         {
-            var window = new MainWindow();
+            IMediaProbeService mediaProbeService = new SprocketMediaProbeService();
+            var window = new MainWindow(mediaProbeService);
             desktop.MainWindow = window;
 
             TryAttach("preview playback", () => _ = PreviewPlaybackController.Attach(window));

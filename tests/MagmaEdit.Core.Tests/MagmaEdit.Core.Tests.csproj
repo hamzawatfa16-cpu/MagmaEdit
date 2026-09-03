@@ -17,5 +17,6 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/MagmaEdit.Core/MagmaEdit.Core.csproj" />
+    <ProjectReference Include="../../src/MagmaEdit.Media.Sprocket/MagmaEdit.Media.Sprocket.csproj" />
   </ItemGroup>
 </Project>
