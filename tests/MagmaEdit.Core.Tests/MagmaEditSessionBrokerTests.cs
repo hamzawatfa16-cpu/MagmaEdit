@@ -74,6 +74,18 @@ public sealed class MagmaEditSessionBrokerTests
         Assert.False(broker.TryGet("user-a", now.AddMinutes(2), out _));
     }
 
+    [Fact]
+    public void UnregisterCanRetryAfterConcurrentRenewal()
+    {
+        var broker = new MagmaEditSessionBroker();
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        broker.Register(CreateRegistration("user-a", "session-a"), now);
+
+        Assert.True(broker.TryRenew("user-a", "session-a", TimeSpan.FromMinutes(10), now.AddMinutes(1), out _));
+        Assert.True(broker.Unregister("user-a", "session-a"));
+        Assert.False(broker.TryGet("user-a", now.AddMinutes(2), out _));
+    }
+
     private static MagmaEditSessionRegistration CreateRegistration(
         string userId,
         string sessionId,
