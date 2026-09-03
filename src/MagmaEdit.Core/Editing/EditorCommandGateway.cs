@@ -89,6 +89,16 @@ public sealed class EditorCommandGateway : IEditorCommandGateway
         History.Execute(new MoveTimelineClipCommand(_timelineEditor, trackId, clipId, timelineStart));
     }
 
+    public void MoveClipToTrack(string sourceTrackId, string destinationTrackId, string clipId, EditTime timelineStart)
+    {
+        History.Execute(new MoveTimelineClipToTrackCommand(
+            _timelineEditor,
+            sourceTrackId,
+            destinationTrackId,
+            clipId,
+            timelineStart));
+    }
+
     public void SplitClip(string trackId, string clipId, EditTime timelinePosition)
     {
         History.Execute(new SplitTimelineClipCommand(_timelineEditor, trackId, clipId, timelinePosition));
