@@ -11,6 +11,8 @@ internal sealed class LiveEditorPipeServer : IAsyncDisposable
     private readonly MainWindow _window;
     private readonly CancellationTokenSource _shutdown = new();
     private readonly Task _runTask;
+    private readonly string? _configuredUserId =
+        Environment.GetEnvironmentVariable("MAGMAEDIT_DESKTOP_USER_ID")?.Trim();
     private bool _disposed;
 
     public LiveEditorPipeServer(MainWindow window)
@@ -99,6 +101,11 @@ internal sealed class LiveEditorPipeServer : IAsyncDisposable
                 return Failure($"Unsupported live editor pipe protocol version '{request.ProtocolVersion}'.");
             }
 
+            if (!IsUserAuthorized(request.UserId))
+            {
+                return Failure("The live editor session is not authorized for this user.");
+            }
+
             return request.Operation switch
             {
                 LiveEditorPipeProtocol.ExecuteOperation => await ExecuteOnUiThreadAsync(request, cancellationToken).ConfigureAwait(false),
@@ -126,6 +133,16 @@ internal sealed class LiveEditorPipeServer : IAsyncDisposable
         {
             return Failure(exception.Message);
         }
+    }
+
+    private bool IsUserAuthorized(string? requestedUserId)
+    {
+        if (string.IsNullOrWhiteSpace(_configuredUserId))
+        {
+            return !string.IsNullOrWhiteSpace(requestedUserId) || requestedUserId is null;
+        }
+
+        return string.Equals(_configuredUserId, requestedUserId, StringComparison.Ordinal);
     }
 
     private Task<LiveEditorPipeResponse> ExecuteOnUiThreadAsync(
