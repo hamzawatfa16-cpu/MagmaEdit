@@ -21,5 +21,6 @@
     <ProjectReference Include="../../src/MagmaEdit.Integration/MagmaEdit.Integration.csproj" />
     <ProjectReference Include="../../src/MagmaEdit.Plugin.Abstractions/MagmaEdit.Plugin.Abstractions.csproj" />
     <ProjectReference Include="../../src/MagmaEdit.PluginHost/MagmaEdit.PluginHost.csproj" />
+    <ProjectReference Include="../MagmaEdit.PluginHost.TestPlugin/MagmaEdit.PluginHost.TestPlugin.csproj" />
   </ItemGroup>
 </Project>
