@@ -68,7 +68,7 @@ public sealed class EditorAutomationSession
 
     public EditorProjectState GetState()
     {
-        IReadOnlyList<EditorMediaState> media = Project.Media
+        EditorMediaState[] media = Project.Media
             .OrderBy(asset => asset.Id, StringComparer.Ordinal)
             .Select(asset => new EditorMediaState(
                 asset.Id,
@@ -82,7 +82,7 @@ public sealed class EditorAutomationSession
                 asset.Metadata?.FramesPerSecond))
             .ToArray();
 
-        IReadOnlyList<EditorTrackState> tracks = Project.Timeline.Tracks
+        EditorTrackState[] tracks = Project.Timeline.Tracks
             .OrderBy(track => track.Id, StringComparer.Ordinal)
             .Select(track => new EditorTrackState(
                 track.Id,
@@ -108,7 +108,7 @@ public sealed class EditorAutomationSession
             Project.Timeline.Height,
             Project.Timeline.FrameRateNumerator,
             Project.Timeline.FrameRateDenominator,
-            media.Count,
+            media.Length,
             media,
             tracks,
             _gateway.History.UndoCount,
