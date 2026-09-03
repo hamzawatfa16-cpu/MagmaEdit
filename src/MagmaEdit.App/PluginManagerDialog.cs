@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
+using Avalonia.Media;
 using MagmaEdit.PluginHost;
 
 namespace MagmaEdit.App;
@@ -37,46 +38,50 @@ internal sealed class PluginManagerDialog : Window
         };
         closeButton.Click += (_, _) => Close();
 
-        Content = new Border
+        var header = new StackPanel
         {
-            Padding = new Thickness(16),
-            Child = new Grid
+            Spacing = 4,
+            Children =
             {
-                RowDefinitions = new RowDefinitions("Auto,*,Auto"),
-                RowSpacing = 12,
-                Children =
+                new TextBlock
                 {
-                    new StackPanel
-                    {
-                        Spacing = 4,
-                        Children =
-                        {
-                            new TextBlock
-                            {
-                                Text = "Plugins",
-                                FontSize = 22,
-                                FontWeight = Avalonia.Media.FontWeight.SemiBold
-                            },
-                            new TextBlock
-                            {
-                                Text = "Discovered plugins are never loaded automatically. Review the publisher and requested capabilities, then load only the plugins you approve.",
-                                TextWrapping = TextWrapping.Wrap,
-                                Opacity = 0.75
-                            }
-                        }
-                    },
-                    new ScrollViewer
-                    {
-                        VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
-                        Content = _pluginList
-                    },
-                    closeButton
+                    Text = "Plugins",
+                    FontSize = 22,
+                    FontWeight = FontWeight.SemiBold
+                },
+                new TextBlock
+                {
+                    Text = "Discovered plugins are never loaded automatically. Review the publisher and requested capabilities, then load only the plugins you approve.",
+                    TextWrapping = TextWrapping.Wrap,
+                    Opacity = 0.75
                 }
             }
         };
 
-        Grid.SetRow(((Grid)((Border)Content).Child!).Children[1], 1);
-        Grid.SetRow(closeButton, 2);
+        var contentGrid = new Grid
+        {
+            RowDefinitions = new RowDefinitions("Auto,*,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                header,
+                new ScrollViewer
+                {
+                    VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+                    Content = _pluginList
+                },
+                closeButton
+            }
+        };
+
+        Grid.SetRow(contentGrid.Children[1], 1);
+        Grid.SetRow(contentGrid.Children[2], 2);
+        Content = new Border
+        {
+            Padding = new Thickness(16),
+            Child = contentGrid
+        };
+
         Refresh();
     }
 
@@ -113,7 +118,7 @@ internal sealed class PluginManagerDialog : Window
                     {
                         Text = descriptor.Manifest.Name,
                         FontSize = 16,
-                        FontWeight = Avalonia.Media.FontWeight.SemiBold
+                        FontWeight = FontWeight.SemiBold
                     },
                     new TextBlock { Text = $"Publisher: {descriptor.Manifest.Publisher}" },
                     new TextBlock { Text = $"Version: {descriptor.Manifest.Version}" },
