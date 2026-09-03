@@ -50,10 +50,13 @@ public sealed class App : Application
                 new InvalidDataException($"{issue.AssemblyPath}: {issue.Message}"));
         }
 
-        _ = LoadPluginsAsync(window);
+        if (_pluginRuntime.Discovery.Plugins.Count > 0 || _pluginRuntime.Discovery.Issues.Count > 0)
+        {
+            window.Opened += async (_, _) => await ShowPluginManagerAsync(window);
+        }
     }
 
-    private async Task LoadPluginsAsync(MainWindow window)
+    private async Task ShowPluginManagerAsync(MainWindow window)
     {
         if (_pluginRuntime is null)
         {
@@ -62,20 +65,14 @@ public sealed class App : Application
 
         try
         {
-            await _pluginRuntime.LoadDiscoveredPluginsAsync(
-                message => window.SetStatusForGallery(message));
-            if (_pluginRuntime.LoadedPluginIds.Count > 0)
-            {
-                window.SetStatusForGallery(
-                    $"Loaded {_pluginRuntime.LoadedPluginIds.Count} plugin(s).");
-            }
-        }
-        catch (OperationCanceledException)
-        {
+            var dialog = new PluginManagerDialog(
+                _pluginRuntime,
+                window.SetStatusForGallery);
+            await dialog.ShowDialog<object?>(window);
         }
         catch (Exception exception)
         {
-            StartupDiagnostics.WriteComponentFailure("plugin runtime", exception);
+            StartupDiagnostics.WriteComponentFailure("plugin manager", exception);
         }
     }
 
