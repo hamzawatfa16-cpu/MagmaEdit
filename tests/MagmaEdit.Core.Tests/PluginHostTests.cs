@@ -57,6 +57,45 @@ public sealed class PluginHostTests
         }
     }
 
+    [Fact]
+    public void CatalogDiscoversValidPluginsInDeterministicOrderAndReportsProblems()
+    {
+        string pluginRoot = Path.Combine(Path.GetTempPath(), "MagmaEditTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(pluginRoot);
+
+        var commands = new TestEditorCommands();
+        var host = new MagmaEditPluginHost(Path.Combine(pluginRoot, "data"), commands);
+        var catalog = new PluginCatalog(host);
+
+        try
+        {
+            string validAssembly = typeof(ThrowingShutdownPlugin).Assembly.Location;
+            string firstPlugin = Path.Combine(pluginRoot, "01-first", "Plugin.dll");
+            string duplicatePlugin = Path.Combine(pluginRoot, "02-duplicate", "Plugin.dll");
+            string invalidAssembly = Path.Combine(pluginRoot, "03-invalid", "NotAPlugin.dll");
+
+            Directory.CreateDirectory(Path.GetDirectoryName(firstPlugin)!);
+            Directory.CreateDirectory(Path.GetDirectoryName(duplicatePlugin)!);
+            Directory.CreateDirectory(Path.GetDirectoryName(invalidAssembly)!);
+            File.Copy(validAssembly, firstPlugin);
+            File.Copy(validAssembly, duplicatePlugin);
+            File.Copy(typeof(MagmaEditPluginHost).Assembly.Location, invalidAssembly);
+
+            PluginDiscoveryResult result = catalog.Discover(pluginRoot);
+
+            Assert.Single(result.Plugins);
+            Assert.Equal("com.magmaedit.tests.throwing-shutdown", result.Plugins[0].Manifest.Id);
+            Assert.Equal(firstPlugin, result.Plugins[0].AssemblyPath);
+            Assert.Equal(2, result.Issues.Count);
+            Assert.Contains(result.Issues, issue => issue.AssemblyPath == duplicatePlugin);
+            Assert.Contains(result.Issues, issue => issue.AssemblyPath == invalidAssembly);
+        }
+        finally
+        {
+            Directory.Delete(pluginRoot, recursive: true);
+        }
+    }
+
     private sealed class TestEditorCommands : IPluginEditorCommands
     {
         public ValueTask<PluginCommandResult> ExecuteAsync(
