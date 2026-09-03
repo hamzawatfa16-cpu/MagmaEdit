@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace MagmaEdit.Integration;
 
 /// <summary>Describes the commands exposed through the vendor-neutral integration boundary.</summary>
@@ -121,6 +123,63 @@ public static class EditorCommandCatalog
             }
         }
 
+        if (!ValidateTimeParameters(request, out message))
+        {
+            return false;
+        }
+
+        message = string.Empty;
+        return true;
+    }
+
+    private static bool ValidateTimeParameters(EditorCommandRequest request, out string message)
+    {
+        switch (request.Command)
+        {
+            case EditorCommandKind.InsertClip:
+            case EditorCommandKind.TrimClip:
+                if (!TryParseTicks(request.SourceInTicks, nameof(EditorCommandRequest.SourceInTicks), out long sourceIn, out message) ||
+                    !TryParseTicks(request.SourceOutTicks, nameof(EditorCommandRequest.SourceOutTicks), out long sourceOut, out message))
+                {
+                    return false;
+                }
+
+                if (sourceOut <= sourceIn)
+                {
+                    message = "SourceOutTicks must be greater than SourceInTicks.";
+                    return false;
+                }
+
+                if (request.Command == EditorCommandKind.InsertClip &&
+                    !TryParseTicks(request.TimelinePositionTicks, nameof(EditorCommandRequest.TimelinePositionTicks), out _, out message))
+                {
+                    return false;
+                }
+
+                return true;
+
+            case EditorCommandKind.MoveClip:
+            case EditorCommandKind.SplitClip:
+                return TryParseTicks(request.TimelinePositionTicks, nameof(EditorCommandRequest.TimelinePositionTicks), out _, out message);
+
+            default:
+                message = string.Empty;
+                return true;
+        }
+    }
+
+    private static bool TryParseTicks(string? value, string parameterName, out long ticks, out string message)
+    {
+        ticks = 0;
+        if (string.IsNullOrWhiteSpace(value) ||
+            !long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out long parsedTicks) ||
+            parsedTicks < 0)
+        {
+            message = $"Parameter '{parameterName}' must be a non-negative integer tick count.";
+            return false;
+        }
+
+        ticks = parsedTicks;
         message = string.Empty;
         return true;
     }
