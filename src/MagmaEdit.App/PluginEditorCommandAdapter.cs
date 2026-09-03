@@ -1,4 +1,3 @@
-using System.Globalization;
 using MagmaEdit.Core.Editing;
 using MagmaEdit.Core.Projects;
 using MagmaEdit.Plugin.Abstractions;
@@ -36,9 +35,10 @@ internal sealed class PluginEditorCommandAdapter : IPluginEditorCommands
         {
             ProjectDocument project = _projectAccessor();
             EditorCommandGateway gateway = GetGateway(project);
-            EditorCommandRequest request = BuildRequest(commandKind, parameters);
-            EditorCommandResult result = new MagmaEdit.Integration.AuthorizedEditorCommandRouter(
-                new MagmaEdit.Integration.EditorCommandRouter(gateway))
+            MagmaEdit.Integration.EditorCommandRequest request = BuildRequest(commandKind, parameters);
+            MagmaEdit.Integration.EditorCommandResult result =
+                new MagmaEdit.Integration.AuthorizedEditorCommandRouter(
+                    new MagmaEdit.Integration.EditorCommandRouter(gateway))
                 .Execute(
                     request,
                     new MagmaEdit.Integration.AutomationClientContext(
@@ -97,43 +97,43 @@ internal sealed class PluginEditorCommandAdapter : IPluginEditorCommands
 
         return command switch
         {
-            EditorCommandKind.AddTrack => new(command, Name: Required(Get(nameof(EditorCommandRequest.Name)), nameof(EditorCommandRequest.Name))),
-            EditorCommandKind.RemoveTrack => new(command, TrackId: Required(Get(nameof(EditorCommandRequest.TrackId)), nameof(EditorCommandRequest.TrackId))),
+            EditorCommandKind.AddTrack => new(command, Name: Required(Get(nameof(MagmaEdit.Integration.EditorCommandRequest.Name)), nameof(MagmaEdit.Integration.EditorCommandRequest.Name))),
+            EditorCommandKind.RemoveTrack => new(command, TrackId: Required(Get(nameof(MagmaEdit.Integration.EditorCommandRequest.TrackId)), nameof(MagmaEdit.Integration.EditorCommandRequest.TrackId))),
             EditorCommandKind.InsertClip => new(
                 command,
-                TrackId: Required(Get(nameof(EditorCommandRequest.TrackId)), nameof(EditorCommandRequest.TrackId)),
-                MediaId: Required(Get(nameof(EditorCommandRequest.MediaId)), nameof(EditorCommandRequest.MediaId)),
-                TimelinePositionTicks: Required(Get(nameof(EditorCommandRequest.TimelinePositionTicks)), nameof(EditorCommandRequest.TimelinePositionTicks)),
-                SourceInTicks: Required(Get(nameof(EditorCommandRequest.SourceInTicks)), nameof(EditorCommandRequest.SourceInTicks)),
-                SourceOutTicks: Required(Get(nameof(EditorCommandRequest.SourceOutTicks)), nameof(EditorCommandRequest.SourceOutTicks))),
+                TrackId: Required(Get(nameof(MagmaEdit.Integration.EditorCommandRequest.TrackId)), nameof(MagmaEdit.Integration.EditorCommandRequest.TrackId)),
+                MediaId: Required(Get(nameof(MagmaEdit.Integration.EditorCommandRequest.MediaId)), nameof(MagmaEdit.Integration.EditorCommandRequest.MediaId)),
+                TimelinePositionTicks: Required(Get(nameof(MagmaEdit.Integration.EditorCommandRequest.TimelinePositionTicks)), nameof(MagmaEdit.Integration.EditorCommandRequest.TimelinePositionTicks)),
+                SourceInTicks: Required(Get(nameof(MagmaEdit.Integration.EditorCommandRequest.SourceInTicks)), nameof(MagmaEdit.Integration.EditorCommandRequest.SourceInTicks)),
+                SourceOutTicks: Required(Get(nameof(MagmaEdit.Integration.EditorCommandRequest.SourceOutTicks)), nameof(MagmaEdit.Integration.EditorCommandRequest.SourceOutTicks))),
             EditorCommandKind.RemoveClip => new(
                 command,
-                TrackId: Required(Get(nameof(EditorCommandRequest.TrackId)), nameof(EditorCommandRequest.TrackId)),
-                ClipId: Required(Get(nameof(EditorCommandRequest.ClipId)), nameof(EditorCommandRequest.ClipId))),
+                TrackId: Required(Get(nameof(MagmaEdit.Integration.EditorCommandRequest.TrackId)), nameof(MagmaEdit.Integration.EditorCommandRequest.TrackId)),
+                ClipId: Required(Get(nameof(MagmaEdit.Integration.EditorCommandRequest.ClipId)), nameof(MagmaEdit.Integration.EditorCommandRequest.ClipId))),
             EditorCommandKind.TrimClip => new(
                 command,
-                TrackId: Required(Get(nameof(EditorCommandRequest.TrackId)), nameof(EditorCommandRequest.TrackId)),
-                ClipId: Required(Get(nameof(EditorCommandRequest.ClipId)), nameof(EditorCommandRequest.ClipId)),
-                SourceInTicks: Required(Get(nameof(EditorCommandRequest.SourceInTicks)), nameof(EditorCommandRequest.SourceInTicks)),
-                SourceOutTicks: Required(Get(nameof(EditorCommandRequest.SourceOutTicks)), nameof(EditorCommandRequest.SourceOutTicks))),
+                TrackId: Required(Get(nameof(MagmaEdit.Integration.EditorCommandRequest.TrackId)), nameof(MagmaEdit.Integration.EditorCommandRequest.TrackId)),
+                ClipId: Required(Get(nameof(MagmaEdit.Integration.EditorCommandRequest.ClipId)), nameof(MagmaEdit.Integration.EditorCommandRequest.ClipId)),
+                SourceInTicks: Required(Get(nameof(MagmaEdit.Integration.EditorCommandRequest.SourceInTicks)), nameof(MagmaEdit.Integration.EditorCommandRequest.SourceInTicks)),
+                SourceOutTicks: Required(Get(nameof(MagmaEdit.Integration.EditorCommandRequest.SourceOutTicks)), nameof(MagmaEdit.Integration.EditorCommandRequest.SourceOutTicks))),
             EditorCommandKind.MoveClip => new(
                 command,
-                TrackId: Required(Get(nameof(EditorCommandRequest.TrackId)), nameof(EditorCommandRequest.TrackId)),
-                ClipId: Required(Get(nameof(EditorCommandRequest.ClipId)), nameof(EditorCommandRequest.ClipId)),
-                TimelinePositionTicks: Required(Get(nameof(EditorCommandRequest.TimelinePositionTicks)), nameof(EditorCommandRequest.TimelinePositionTicks))),
+                TrackId: Required(Get(nameof(MagmaEdit.Integration.EditorCommandRequest.TrackId)), nameof(MagmaEdit.Integration.EditorCommandRequest.TrackId)),
+                ClipId: Required(Get(nameof(MagmaEdit.Integration.EditorCommandRequest.ClipId)), nameof(MagmaEdit.Integration.EditorCommandRequest.ClipId)),
+                TimelinePositionTicks: Required(Get(nameof(MagmaEdit.Integration.EditorCommandRequest.TimelinePositionTicks)), nameof(MagmaEdit.Integration.EditorCommandRequest.TimelinePositionTicks))),
             EditorCommandKind.SplitClip => new(
                 command,
-                TrackId: Required(Get(nameof(EditorCommandRequest.TrackId)), nameof(EditorCommandRequest.TrackId)),
-                ClipId: Required(Get(nameof(EditorCommandRequest.ClipId)), nameof(EditorCommandRequest.ClipId)),
-                TimelinePositionTicks: Required(Get(nameof(EditorCommandRequest.TimelinePositionTicks)), nameof(EditorCommandRequest.TimelinePositionTicks))),
+                TrackId: Required(Get(nameof(MagmaEdit.Integration.EditorCommandRequest.TrackId)), nameof(MagmaEdit.Integration.EditorCommandRequest.TrackId)),
+                ClipId: Required(Get(nameof(MagmaEdit.Integration.EditorCommandRequest.ClipId)), nameof(MagmaEdit.Integration.EditorCommandRequest.ClipId)),
+                TimelinePositionTicks: Required(Get(nameof(MagmaEdit.Integration.EditorCommandRequest.TimelinePositionTicks)), nameof(MagmaEdit.Integration.EditorCommandRequest.TimelinePositionTicks))),
             EditorCommandKind.RenameMedia => new(
                 command,
-                MediaId: Required(Get(nameof(EditorCommandRequest.MediaId)), nameof(EditorCommandRequest.MediaId)),
-                Name: Required(Get(nameof(EditorCommandRequest.Name)), nameof(EditorCommandRequest.Name))),
+                MediaId: Required(Get(nameof(MagmaEdit.Integration.EditorCommandRequest.MediaId)), nameof(MagmaEdit.Integration.EditorCommandRequest.MediaId)),
+                Name: Required(Get(nameof(MagmaEdit.Integration.EditorCommandRequest.Name)), nameof(MagmaEdit.Integration.EditorCommandRequest.Name))),
             EditorCommandKind.SetMediaPublished => new(
                 command,
-                MediaId: Required(Get(nameof(EditorCommandRequest.MediaId)), nameof(EditorCommandRequest.MediaId)),
-                IsPublished: ParseBoolean(Get(nameof(EditorCommandRequest.IsPublished)))),
+                MediaId: Required(Get(nameof(MagmaEdit.Integration.EditorCommandRequest.MediaId)), nameof(MagmaEdit.Integration.EditorCommandRequest.MediaId)),
+                IsPublished: ParseBoolean(Get(nameof(MagmaEdit.Integration.EditorCommandRequest.IsPublished)))),
             EditorCommandKind.Undo => new(command),
             EditorCommandKind.Redo => new(command),
             _ => throw new ArgumentOutOfRangeException(nameof(command), command, "Unsupported editor command.")
