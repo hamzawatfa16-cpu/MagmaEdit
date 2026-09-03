@@ -286,7 +286,7 @@ public sealed class MediaGalleryController : IDisposable
         };
         publishButton.Click += (_, _) =>
         {
-            if (!_setPublished(asset, !asset.IsPublished))
+            if (!_setPublished(asset))
             {
                 return;
             }
