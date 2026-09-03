@@ -35,29 +35,34 @@ public sealed class PluginHostTests
     }
 
     [Fact]
-    public async Task DeniesEditorCommandsWhenPluginDoesNotDeclareCapability()
+    public async Task DeniesEditorCommandsWhenCapabilityIsMissing()
     {
-        string dataRoot = Path.Combine(Path.GetTempPath(), "MagmaEditTests", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(dataRoot);
+        var commands = new TestEditorCommands();
+        var gate = new PluginEditorCommandGate([], commands);
 
-        var host = new MagmaEditPluginHost(dataRoot, new TestEditorCommands());
+        PluginCommandResult result = await gate.ExecuteAsync(
+            "AddTrack",
+            new Dictionary<string, string?>());
 
-        try
-        {
-            string assemblyPath = typeof(NoEditorCommandsPlugin).Assembly.Location;
-            LoadedPlugin loaded = await host.LoadAsync(assemblyPath);
-            string pluginDataDirectory = Path.Combine(dataRoot, loaded.Manifest.Id);
+        Assert.False(result.Succeeded);
+        Assert.Equal(
+            "The plugin manifest does not declare the EditorCommands capability.",
+            result.Message);
+        Assert.Equal(0, commands.ExecutionCount);
+    }
 
-            Assert.Equal(
-                "The plugin manifest does not declare the EditorCommands capability.",
-                File.ReadAllText(Path.Combine(pluginDataDirectory, "editor-command-result.txt")));
+    [Fact]
+    public async Task ForwardsEditorCommandsWhenCapabilityIsDeclared()
+    {
+        var commands = new TestEditorCommands();
+        var gate = new PluginEditorCommandGate([PluginCapability.EditorCommands], commands);
 
-            await loaded.DisposeAsync();
-        }
-        finally
-        {
-            Directory.Delete(dataRoot, recursive: true);
-        }
+        PluginCommandResult result = await gate.ExecuteAsync(
+            "AddTrack",
+            new Dictionary<string, string?>());
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(1, commands.ExecutionCount);
     }
 
     [Fact]
@@ -120,11 +125,16 @@ public sealed class PluginHostTests
 
     private sealed class TestEditorCommands : IPluginEditorCommands
     {
+        public int ExecutionCount { get; private set; }
+
         public ValueTask<PluginCommandResult> ExecuteAsync(
             string command,
             IReadOnlyDictionary<string, string?> parameters,
-            CancellationToken cancellationToken = default) =>
-            ValueTask.FromResult(PluginCommandResult.Success());
+            CancellationToken cancellationToken = default)
+        {
+            ExecutionCount++;
+            return ValueTask.FromResult(PluginCommandResult.Success());
+        }
     }
 }
 
