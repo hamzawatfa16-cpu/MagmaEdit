@@ -46,13 +46,15 @@ if (string.IsNullOrWhiteSpace(bearerToken))
 
 string listenUrl = Environment.GetEnvironmentVariable("MAGMAEDIT_MCP_HTTP_URL")?.Trim()
     ?? "http://127.0.0.1:3001";
-if (!Uri.TryCreate(listenUrl, UriKind.Absolute, out Uri? listenUri)
-    || (listenUri.Scheme is not "http" and not "https")
-    || string.IsNullOrWhiteSpace(listenUri.Host))
+if (!Uri.TryCreate(listenUrl, UriKind.Absolute, out Uri? parsedListenUri)
+    || (parsedListenUri.Scheme is not "http" and not "https")
+    || string.IsNullOrWhiteSpace(parsedListenUri.Host))
 {
     throw new InvalidOperationException(
         $"MAGMAEDIT_MCP_HTTP_URL must be an absolute HTTP or HTTPS URL. Received '{listenUrl}'.");
 }
+
+Uri listenUri = parsedListenUri;
 
 HashSet<string> allowedHosts = ParseList(
     Environment.GetEnvironmentVariable("MAGMAEDIT_MCP_HTTP_ALLOWED_HOSTS"),
