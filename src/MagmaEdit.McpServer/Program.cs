@@ -55,4 +55,19 @@ public sealed class MagmaEditTools
         ArgumentNullException.ThrowIfNull(session);
         return session.Execute(request);
     }
+
+    [McpServerTool(
+        Name = MagmaEdit.Integration.McpEditorToolContract.GetEditorStateToolName,
+        Title = "Get MagmaEdit editor state",
+        ReadOnly = true,
+        Destructive = false,
+        Idempotent = true,
+        OpenWorld = false)]
+    [Description("Return a read-only snapshot of the loaded MagmaEdit project, timeline, media, and undo/redo counts.")]
+    public static MagmaEdit.Integration.EditorProjectState GetEditorState(
+        MagmaEdit.Integration.EditorAutomationSession session)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        return session.GetState();
+    }
 }
