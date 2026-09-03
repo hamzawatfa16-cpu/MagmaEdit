@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Themes.Fluent;
+using MagmaEdit.Auth;
 using MagmaEdit.Core.Media;
 using MagmaEdit.Media.Sprocket;
 using MagmaEdit.PluginHost;
@@ -12,6 +13,7 @@ public sealed class App : Application, IAsyncDisposable
 {
     private PluginRuntime? _pluginRuntime;
     private LiveEditorPipeServer? _liveEditorPipeServer;
+    private IAuthService? _authService;
 
     public override void Initialize()
     {
@@ -22,24 +24,90 @@ public sealed class App : Application, IAsyncDisposable
     {
         if (ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
         {
-            IMediaProbeService mediaProbeService = new SprocketMediaProbeService();
-            var window = new MainWindow(mediaProbeService);
-            desktop.MainWindow = window;
             desktop.Exit += async (_, _) => await DisposeAppServicesAsync();
-
-            TryAttach("preview playback", () => _ = PreviewPlaybackController.Attach(window));
-            TryAttach("media gallery", () =>
-            {
-                MediaGalleryController gallery = MediaGalleryController.Attach(window);
-                window.SetMediaGalleryController(gallery);
-            });
-            TryAttach("export controller", () => _ = ExportController.Attach(window));
-            TryAttach("update controller", () => _ = UpdateController.Attach(window));
-            TryAttach("plugin runtime", () => StartPluginRuntime(window));
-            TryAttach("live editor IPC", () => _liveEditorPipeServer = new LiveEditorPipeServer(window));
+            _ = InitializeDesktopAsync(desktop);
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private async Task InitializeDesktopAsync(
+        Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        try
+        {
+            _authService = CreateAuthService();
+            AuthResult restored = await _authService.RestoreSessionAsync().ConfigureAwait(false);
+            if (!restored.Succeeded)
+            {
+                await ShowAuthWindowAsync(desktop).ConfigureAwait(false);
+                return;
+            }
+
+            OpenEditor(desktop);
+        }
+        catch (Exception exception)
+        {
+            StartupDiagnostics.WriteComponentFailure("authentication startup", exception);
+            desktop.Shutdown();
+        }
+    }
+
+    private async Task ShowAuthWindowAsync(
+        Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        if (_authService is null)
+        {
+            desktop.Shutdown();
+            return;
+        }
+
+        var authWindow = new AuthWindow(_authService, () => OpenEditor(desktop));
+        desktop.MainWindow = authWindow;
+        authWindow.Show();
+        await Task.CompletedTask.ConfigureAwait(true);
+    }
+
+    private void OpenEditor(
+        Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        if (desktop.MainWindow is MainWindow)
+        {
+            return;
+        }
+
+        IMediaProbeService mediaProbeService = new SprocketMediaProbeService();
+        var window = new MainWindow(mediaProbeService);
+        desktop.MainWindow = window;
+
+        TryAttach("preview playback", () => _ = PreviewPlaybackController.Attach(window));
+        TryAttach("media gallery", () =>
+        {
+            MediaGalleryController gallery = MediaGalleryController.Attach(window);
+            window.SetMediaGalleryController(gallery);
+        });
+        TryAttach("export controller", () => _ = ExportController.Attach(window));
+        TryAttach("update controller", () => _ = UpdateController.Attach(window));
+        TryAttach("plugin runtime", () => StartPluginRuntime(window));
+        TryAttach("live editor IPC", () => _liveEditorPipeServer = new LiveEditorPipeServer(window));
+        window.Show();
+
+        if (desktop.MainWindow is AuthWindow)
+        {
+            desktop.MainWindow.Close();
+        }
+    }
+
+    private static IAuthService CreateAuthService()
+    {
+        if (!AuthConfiguration.TryLoadFromEnvironment(out AuthConfiguration? configuration, out string message))
+        {
+            return new UnavailableAuthService(message);
+        }
+
+        return new GoogleOAuthService(
+            configuration!.SupabaseUrl,
+            configuration.SupabasePublishableKey);
     }
 
     private void StartPluginRuntime(MainWindow window)
@@ -96,22 +164,36 @@ public sealed class App : Application, IAsyncDisposable
             }
         }
 
-        if (_pluginRuntime is null)
+        if (_pluginRuntime is not null)
         {
-            return;
+            try
+            {
+                await _pluginRuntime.DisposeAsync();
+            }
+            catch (Exception exception)
+            {
+                StartupDiagnostics.WriteComponentFailure("plugin shutdown", exception);
+            }
+            finally
+            {
+                _pluginRuntime = null;
+            }
         }
 
-        try
+        if (_authService is not null)
         {
-            await _pluginRuntime.DisposeAsync();
-        }
-        catch (Exception exception)
-        {
-            StartupDiagnostics.WriteComponentFailure("plugin shutdown", exception);
-        }
-        finally
-        {
-            _pluginRuntime = null;
+            try
+            {
+                await _authService.DisposeAsync();
+            }
+            catch (Exception exception)
+            {
+                StartupDiagnostics.WriteComponentFailure("authentication shutdown", exception);
+            }
+            finally
+            {
+                _authService = null;
+            }
         }
     }
 
