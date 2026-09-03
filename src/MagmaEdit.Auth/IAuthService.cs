@@ -6,15 +6,7 @@ public interface IAuthService : IAsyncDisposable
 
     Task<AuthResult> RestoreSessionAsync(CancellationToken cancellationToken = default);
 
-    Task<AuthResult> SignInAsync(
-        string email,
-        string password,
-        CancellationToken cancellationToken = default);
-
-    Task<AuthResult> SignUpAsync(
-        string email,
-        string password,
-        CancellationToken cancellationToken = default);
+    Task<AuthResult> SignInWithGoogleAsync(CancellationToken cancellationToken = default);
 
     Task SignOutAsync(CancellationToken cancellationToken = default);
 }
