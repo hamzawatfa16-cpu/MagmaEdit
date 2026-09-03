@@ -7,6 +7,7 @@ public sealed class PluginManager : IAsyncDisposable
 {
     private readonly MagmaEditPluginHost _host;
     private readonly Dictionary<string, LoadedPlugin> _loadedPlugins = new(StringComparer.Ordinal);
+    private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
     private bool _disposed;
 
     public PluginManager(string pluginDataRoot, IPluginEditorCommands editorCommands)
@@ -23,26 +24,37 @@ public sealed class PluginManager : IAsyncDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(descriptor);
+        cancellationToken.ThrowIfCancellationRequested();
 
-        if (_loadedPlugins.ContainsKey(descriptor.Manifest.Id))
+        await _lifecycleGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            throw new InvalidOperationException(
-                $"Plugin '{descriptor.Manifest.Id}' is already loaded.");
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            if (_loadedPlugins.ContainsKey(descriptor.Manifest.Id))
+            {
+                throw new InvalidOperationException(
+                    $"Plugin '{descriptor.Manifest.Id}' is already loaded.");
+            }
+
+            LoadedPlugin loaded = await _host.LoadAsync(
+                descriptor.AssemblyPath,
+                cancellationToken).ConfigureAwait(false);
+
+            if (!string.Equals(loaded.Manifest.Id, descriptor.Manifest.Id, StringComparison.Ordinal))
+            {
+                await loaded.DisposeAsync().ConfigureAwait(false);
+                throw new InvalidDataException(
+                    $"Plugin manifest changed between discovery and load for '{descriptor.Manifest.Id}'.");
+            }
+
+            _loadedPlugins.Add(loaded.Manifest.Id, loaded);
+            return loaded;
         }
-
-        LoadedPlugin loaded = await _host.LoadAsync(
-            descriptor.AssemblyPath,
-            cancellationToken).ConfigureAwait(false);
-
-        if (!string.Equals(loaded.Manifest.Id, descriptor.Manifest.Id, StringComparison.Ordinal))
+        finally
         {
-            await loaded.DisposeAsync().ConfigureAwait(false);
-            throw new InvalidDataException(
-                $"Plugin manifest changed between discovery and load for '{descriptor.Manifest.Id}'.");
+            _lifecycleGate.Release();
         }
-
-        _loadedPlugins.Add(loaded.Manifest.Id, loaded);
-        return loaded;
     }
 
     public async ValueTask<bool> UnloadAsync(
@@ -53,13 +65,23 @@ public sealed class PluginManager : IAsyncDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(pluginId);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (!_loadedPlugins.Remove(pluginId, out LoadedPlugin? loaded))
+        await _lifecycleGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            return false;
-        }
+            ObjectDisposedException.ThrowIf(_disposed, this);
 
-        await loaded.DisposeAsync().ConfigureAwait(false);
-        return true;
+            if (!_loadedPlugins.Remove(pluginId, out LoadedPlugin? loaded))
+            {
+                return false;
+            }
+
+            await loaded.DisposeAsync().ConfigureAwait(false);
+            return true;
+        }
+        finally
+        {
+            _lifecycleGate.Release();
+        }
     }
 
     public async ValueTask DisposeAsync()
@@ -69,25 +91,39 @@ public sealed class PluginManager : IAsyncDisposable
             return;
         }
 
-        _disposed = true;
-        Exception? firstException = null;
-        foreach (string pluginId in _loadedPlugins.Keys.Order(StringComparer.Ordinal).ToArray())
+        await _lifecycleGate.WaitAsync().ConfigureAwait(false);
+        try
         {
-            LoadedPlugin loaded = _loadedPlugins[pluginId];
-            try
+            if (_disposed)
             {
-                await loaded.DisposeAsync().ConfigureAwait(false);
+                return;
             }
-            catch (Exception exception)
+
+            _disposed = true;
+            Exception? firstException = null;
+            foreach (string pluginId in _loadedPlugins.Keys.Order(StringComparer.Ordinal).ToArray())
             {
-                firstException ??= exception;
+                LoadedPlugin loaded = _loadedPlugins[pluginId];
+                try
+                {
+                    await loaded.DisposeAsync().ConfigureAwait(false);
+                }
+                catch (Exception exception)
+                {
+                    firstException ??= exception;
+                }
+            }
+
+            _loadedPlugins.Clear();
+            if (firstException is not null)
+            {
+                throw firstException;
             }
         }
-
-        _loadedPlugins.Clear();
-        if (firstException is not null)
+        finally
         {
-            throw firstException;
+            _lifecycleGate.Release();
+            _lifecycleGate.Dispose();
         }
     }
 }
