@@ -26,7 +26,7 @@ public sealed class MainWindow : Window
     private readonly ProjectStore _projectStore;
     private readonly ProjectSession _projectSession;
     private readonly IMediaProbeService _mediaProbeService;
-    private IEditorCommandGateway _commandGateway;
+    private EditorCommandGateway _commandGateway;
     private ProjectDocument _project;
     private string _projectPath;
     private readonly StackPanel _mediaList;
