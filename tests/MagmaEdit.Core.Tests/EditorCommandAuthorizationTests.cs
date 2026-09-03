@@ -1,3 +1,5 @@
+using MagmaEdit.Core.Editing;
+using MagmaEdit.Core.Projects;
 using MagmaEdit.Integration;
 
 namespace MagmaEdit.Core.Tests;
@@ -68,6 +70,42 @@ public sealed class EditorCommandAuthorizationTests
         EditorCommandAuthorizationResult result = EditorCommandAuthorizer.Authorize(request, client);
 
         Assert.True(result.Authorized);
+    }
+
+    [Fact]
+    public void AuthorizedRouterBlocksUnauthorizedMutationBeforeEditorHistory()
+    {
+        EditorCommandGateway gateway = new(ProjectDocument.Create("Authorization Test"));
+        var router = new AuthorizedEditorCommandRouter(new EditorCommandRouter(gateway));
+        AutomationClientContext client = new(
+            "mcp-session",
+            AutomationClientKind.Mcp,
+            new HashSet<EditorCommandCapability> { EditorCommandCapability.MediaManagement });
+
+        EditorCommandResult result = router.Execute(
+            new EditorCommandRequest(EditorCommandKind.AddTrack, Name: "Video"),
+            client);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(0, gateway.History.UndoCount);
+    }
+
+    [Fact]
+    public void AuthorizedRouterForwardsExplicitlyGrantedMutation()
+    {
+        EditorCommandGateway gateway = new(ProjectDocument.Create("Authorization Test"));
+        var router = new AuthorizedEditorCommandRouter(new EditorCommandRouter(gateway));
+        AutomationClientContext client = new(
+            "plugin-session",
+            AutomationClientKind.Plugin,
+            new HashSet<EditorCommandCapability> { EditorCommandCapability.TimelineEditing });
+
+        EditorCommandResult result = router.Execute(
+            new EditorCommandRequest(EditorCommandKind.AddTrack, Name: "Video"),
+            client);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(1, gateway.History.UndoCount);
     }
 
     [Fact]
