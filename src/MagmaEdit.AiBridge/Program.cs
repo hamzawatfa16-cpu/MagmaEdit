@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using MagmaEdit.AiBridge;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -23,10 +21,12 @@ app.MapPost("/v1/edit", async (
     AiBridgeOptions bridgeOptions,
     CancellationToken cancellationToken) =>
 {
-    if (!HasValidBearerToken(httpRequest, bridgeOptions.BridgeBearerToken))
+    if (!AiBridgeSecurity.HasValidBearerToken(
+        httpRequest.Headers.Authorization.ToString(),
+        bridgeOptions.BridgeBearerToken))
         return Results.Unauthorized();
 
-    if (request.AllowMutations && !bridgeOptions.AllowMutations)
+    if (!AiBridgeSecurity.IsMutationAllowed(request.AllowMutations, bridgeOptions.AllowMutations))
         return Results.StatusCode(StatusCodes.Status403Forbidden);
 
     try
@@ -52,23 +52,3 @@ app.MapPost("/v1/edit", async (
 .WithName("ExecuteAiEdit");
 
 app.Run();
-
-static bool HasValidBearerToken(HttpRequest request, string expectedToken)
-{
-    const string prefix = "Bearer ";
-
-    if (!request.Headers.TryGetValue("Authorization", out var authorizationValues))
-        return false;
-
-    string authorization = authorizationValues.ToString();
-    if (!authorization.StartsWith(prefix, StringComparison.Ordinal))
-        return false;
-
-    string suppliedToken = authorization[prefix.Length..];
-    if (suppliedToken.Length == 0 || expectedToken.Length == 0)
-        return false;
-
-    return CryptographicOperations.FixedTimeEquals(
-        Encoding.UTF8.GetBytes(suppliedToken),
-        Encoding.UTF8.GetBytes(expectedToken));
-}
