@@ -70,7 +70,7 @@ public sealed class MagmaEditPluginHost
             string pluginDataDirectory = Path.Combine(_pluginDataRoot, plugin.Manifest.Id);
             Directory.CreateDirectory(pluginDataDirectory);
 
-            IPluginEditorCommands editorCommands = new CapabilityRestrictedEditorCommands(
+            IPluginEditorCommands editorCommands = new PluginEditorCommandGate(
                 plugin.Manifest.Capabilities,
                 _editorCommands);
             var context = new PluginContext(pluginDataDirectory, editorCommands);
@@ -136,37 +136,6 @@ public sealed class MagmaEditPluginHost
         public IPluginEditorCommands EditorCommands { get; }
     }
 
-    private sealed class CapabilityRestrictedEditorCommands : IPluginEditorCommands
-    {
-        private readonly IReadOnlyList<PluginCapability> _capabilities;
-        private readonly IPluginEditorCommands _inner;
-
-        public CapabilityRestrictedEditorCommands(
-            IReadOnlyList<PluginCapability> capabilities,
-            IPluginEditorCommands inner)
-        {
-            _capabilities = capabilities;
-            _inner = inner;
-        }
-
-        public ValueTask<PluginCommandResult> ExecuteAsync(
-            string command,
-            IReadOnlyDictionary<string, string?> parameters,
-            CancellationToken cancellationToken = default)
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(command);
-            ArgumentNullException.ThrowIfNull(parameters);
-
-            if (!_capabilities.Contains(PluginCapability.EditorCommands))
-            {
-                return ValueTask.FromResult(PluginCommandResult.Failure(
-                    "The plugin manifest does not declare the EditorCommands capability."));
-            }
-
-            return _inner.ExecuteAsync(command, parameters, cancellationToken);
-        }
-    }
-
     private sealed class PluginLoadContext : AssemblyLoadContext
     {
         private readonly AssemblyDependencyResolver _resolver;
@@ -190,6 +159,40 @@ public sealed class MagmaEditPluginHost
             string? assemblyPath = _resolver.ResolveAssemblyToPath(assemblyName);
             return assemblyPath is null ? null : LoadFromAssemblyPath(assemblyPath);
         }
+    }
+}
+
+/// <summary>Restricts plugin editor commands to capabilities declared by the plugin manifest.</summary>
+public sealed class PluginEditorCommandGate : IPluginEditorCommands
+{
+    private readonly IReadOnlyList<PluginCapability> _capabilities;
+    private readonly IPluginEditorCommands _inner;
+
+    public PluginEditorCommandGate(
+        IReadOnlyList<PluginCapability> capabilities,
+        IPluginEditorCommands inner)
+    {
+        ArgumentNullException.ThrowIfNull(capabilities);
+        ArgumentNullException.ThrowIfNull(inner);
+        _capabilities = capabilities;
+        _inner = inner;
+    }
+
+    public ValueTask<PluginCommandResult> ExecuteAsync(
+        string command,
+        IReadOnlyDictionary<string, string?> parameters,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(command);
+        ArgumentNullException.ThrowIfNull(parameters);
+
+        if (!_capabilities.Contains(PluginCapability.EditorCommands))
+        {
+            return ValueTask.FromResult(PluginCommandResult.Failure(
+                "The plugin manifest does not declare the EditorCommands capability."));
+        }
+
+        return _inner.ExecuteAsync(command, parameters, cancellationToken);
     }
 }
 
