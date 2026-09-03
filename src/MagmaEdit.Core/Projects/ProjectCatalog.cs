@@ -19,9 +19,33 @@ public sealed class ProjectCatalog
         Directory.CreateDirectory(_workspace.Projects);
 
         List<ProjectSummary> summaries = [];
-        foreach (string path in Directory.EnumerateFiles(_workspace.Projects, $"*{ProjectExtension}", SearchOption.TopDirectoryOnly))
+        try
         {
-            summaries.Add(ReadSummary(path));
+            foreach (string path in Directory.EnumerateFiles(
+                         _workspace.Projects,
+                         $"*{ProjectExtension}",
+                         SearchOption.TopDirectoryOnly))
+            {
+                summaries.Add(ReadSummary(path));
+            }
+        }
+        catch (IOException exception)
+        {
+            summaries.Add(new ProjectSummary(
+                _workspace.Projects,
+                Path.GetFileName(_workspace.Projects),
+                DateTimeOffset.MinValue,
+                false,
+                exception.Message));
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            summaries.Add(new ProjectSummary(
+                _workspace.Projects,
+                Path.GetFileName(_workspace.Projects),
+                DateTimeOffset.MinValue,
+                false,
+                exception.Message));
         }
 
         return summaries
