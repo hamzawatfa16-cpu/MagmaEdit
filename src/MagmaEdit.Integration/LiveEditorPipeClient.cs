@@ -22,7 +22,7 @@ public sealed class LiveEditorPipeClient
             ".",
             _pipeName,
             PipeDirection.InOut,
-            PipeOptions.Asynchronous);
+            PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
 
         try
         {
@@ -34,6 +34,10 @@ public sealed class LiveEditorPipeClient
             return false;
         }
         catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
         {
             return false;
         }
@@ -50,7 +54,7 @@ public sealed class LiveEditorPipeClient
             ".",
             _pipeName,
             PipeDirection.InOut,
-            PipeOptions.Asynchronous);
+            PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
 
         await client.ConnectAsync(cancellationToken).ConfigureAwait(false);
 
