@@ -22,13 +22,10 @@ public sealed class GoogleOAuthService : IAuthService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(supabaseUrl);
         ArgumentException.ThrowIfNullOrWhiteSpace(publishableKey);
-        if (callbackTimeoutSeconds <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(callbackTimeoutSeconds));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(callbackTimeoutSeconds);
 
         Uri root = CreateSupabaseUri(supabaseUrl);
-        _client = new Client(new ClientOptions<Session>
+        _client = new Client(new ClientOptions
         {
             Url = new Uri(root, "auth/v1").ToString().TrimEnd('/'),
             Headers = new Dictionary<string, string>
@@ -66,20 +63,20 @@ public sealed class GoogleOAuthService : IAuthService
 
         try
         {
-            ProviderAuthState authState = _client.GetUriForProvider(
-                Provider.Google,
+            ProviderAuthState authState = await _client.SignIn(
+                Constants.Provider.Google,
                 new SignInOptions
                 {
-                    FlowType = OAuthFlowType.PKCE,
+                    FlowType = Constants.OAuthFlowType.PKCE,
                     RedirectTo = redirectUri
-                });
+                }).ConfigureAwait(false);
 
             OpenBrowser(authState.Uri);
             Uri callbackUri = await callback.WaitForCallbackAsync(
                 TimeSpan.FromSeconds(_callbackTimeoutSeconds),
                 cancellationToken).ConfigureAwait(false);
 
-            if (!callback.TryGetAuthorizationError(callbackUri, out string error))
+            if (!CallbackListener.TryGetAuthorizationError(callbackUri, out string error))
             {
                 string? code = GetQueryParameter(callbackUri, "code");
                 if (string.IsNullOrWhiteSpace(code))
@@ -141,6 +138,7 @@ public sealed class GoogleOAuthService : IAuthService
     public ValueTask DisposeAsync()
     {
         _disposed = true;
+        _client.Shutdown();
         return ValueTask.CompletedTask;
     }
 
@@ -150,10 +148,10 @@ public sealed class GoogleOAuthService : IAuthService
     {
         try
         {
-            Session? restored = await _client.SetSession(
+            Session restored = await _client.SetSession(
                 session.AccessToken,
                 session.RefreshToken).ConfigureAwait(false);
-            if (restored?.User is null)
+            if (restored.User is null)
             {
                 _sessionStore.Delete();
                 CurrentSession = null;
@@ -192,18 +190,21 @@ public sealed class GoogleOAuthService : IAuthService
             throw new InvalidDataException("Supabase returned an incomplete authentication session.");
         }
 
-        long expiresAtSeconds = session.ExpiresAt;
-        if (expiresAtSeconds <= 0)
+        if (session.ExpiresIn <= 0 || session.CreatedAt == default)
         {
             throw new InvalidDataException("Supabase returned an invalid session expiration time.");
         }
+
+        DateTimeOffset expiresAtUtc = new DateTimeOffset(
+            session.CreatedAt.ToUniversalTime(),
+            TimeSpan.Zero).AddSeconds(session.ExpiresIn);
 
         return new AuthSession(
             session.AccessToken,
             session.RefreshToken,
             session.User.Id,
             session.User.Email,
-            DateTimeOffset.FromUnixTimeSeconds(expiresAtSeconds));
+            expiresAtUtc);
     }
 
     private static Uri CreateSupabaseUri(string value)
@@ -309,7 +310,7 @@ public sealed class GoogleOAuthService : IAuthService
             }
         }
 
-        public bool TryGetAuthorizationError(Uri uri, out string error)
+        public static bool TryGetAuthorizationError(Uri uri, out string error)
         {
             string? code = GetQueryParameter(uri, "error");
             string? description = GetQueryParameter(uri, "error_description");
