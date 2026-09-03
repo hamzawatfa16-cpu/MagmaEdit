@@ -19,7 +19,7 @@ public sealed class SessionStore
 
     public SessionStore(string? path = null)
     {
-        _path = Path.GetFullPath(path ?? Path.Combine(
+        _path = System.IO.Path.GetFullPath(path ?? System.IO.Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "MagmaEdit",
             "Auth",
