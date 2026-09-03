@@ -8,7 +8,7 @@ using MagmaEdit.PluginHost;
 
 namespace MagmaEdit.App;
 
-public sealed class App : Application
+public sealed class App : Application, IAsyncDisposable
 {
     private PluginRuntime? _pluginRuntime;
     private LiveEditorPipeServer? _liveEditorPipeServer;
@@ -114,6 +114,9 @@ public sealed class App : Application
             _pluginRuntime = null;
         }
     }
+
+    public ValueTask DisposeAsync() =>
+        new(DisposeAppServicesAsync());
 
     private static void TryAttach(string componentName, Action attach)
     {
