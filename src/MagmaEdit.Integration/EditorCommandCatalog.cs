@@ -16,8 +16,8 @@ public enum EditorCommandCapability
 /// <summary>Provides deterministic command metadata and boundary validation for automation clients.</summary>
 public static class EditorCommandCatalog
 {
-    private static readonly IReadOnlyDictionary<EditorCommandKind, EditorCommandDefinition> Definitions =
-        new Dictionary<EditorCommandKind, EditorCommandDefinition>
+    private static readonly Dictionary<EditorCommandKind, EditorCommandDefinition> Definitions =
+        new()
         {
             [EditorCommandKind.AddTrack] = new(
                 EditorCommandKind.AddTrack,
