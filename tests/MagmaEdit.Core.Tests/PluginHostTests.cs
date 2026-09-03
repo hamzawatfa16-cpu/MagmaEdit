@@ -35,6 +35,32 @@ public sealed class PluginHostTests
     }
 
     [Fact]
+    public async Task DeniesEditorCommandsWhenPluginDoesNotDeclareCapability()
+    {
+        string dataRoot = Path.Combine(Path.GetTempPath(), "MagmaEditTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dataRoot);
+
+        var host = new MagmaEditPluginHost(dataRoot, new TestEditorCommands());
+
+        try
+        {
+            string assemblyPath = typeof(NoEditorCommandsPlugin).Assembly.Location;
+            LoadedPlugin loaded = await host.LoadAsync(assemblyPath);
+            string pluginDataDirectory = Path.Combine(dataRoot, loaded.Manifest.Id);
+
+            Assert.Equal(
+                "The plugin manifest does not declare the EditorCommands capability.",
+                File.ReadAllText(Path.Combine(pluginDataDirectory, "editor-command-result.txt")));
+
+            await loaded.DisposeAsync();
+        }
+        finally
+        {
+            Directory.Delete(dataRoot, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task UnloadsPluginWhenShutdownFails()
     {
         string dataRoot = Path.Combine(Path.GetTempPath(), "MagmaEditTests", Guid.NewGuid().ToString("N"));
