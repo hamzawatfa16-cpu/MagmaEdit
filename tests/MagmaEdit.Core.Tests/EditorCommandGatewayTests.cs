@@ -1,5 +1,6 @@
 using MagmaEdit.Core.Editing;
 using MagmaEdit.Core.Media;
+using MagmaEdit.Core.Projects;
 
 namespace MagmaEdit.Core.Tests;
 
