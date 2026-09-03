@@ -54,6 +54,19 @@ if (!Uri.TryCreate(listenUrl, UriKind.Absolute, out Uri? listenUri)
         $"MAGMAEDIT_MCP_HTTP_URL must be an absolute HTTP or HTTPS URL. Received '{listenUrl}'.");
 }
 
+HashSet<string> allowedHosts = ParseList(
+    Environment.GetEnvironmentVariable("MAGMAEDIT_MCP_HTTP_ALLOWED_HOSTS"),
+    listenUri.Host,
+    "localhost",
+    "127.0.0.1",
+    "::1");
+
+HashSet<string> allowedOrigins = ParseList(
+    Environment.GetEnvironmentVariable("MAGMAEDIT_MCP_HTTP_ALLOWED_ORIGINS"),
+    $"{listenUri.Scheme}://{listenUri.Authority}",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001");
+
 WebApplicationBuilder webBuilder = WebApplication.CreateBuilder(args);
 webBuilder.Services.AddSingleton(target);
 webBuilder.Services
@@ -69,6 +82,21 @@ app.Use(async (context, next) =>
     if (!context.Request.Path.StartsWithSegments("/mcp"))
     {
         await next().ConfigureAwait(false);
+        return;
+    }
+
+    string requestHost = context.Request.Host.Value;
+    if (!IsAllowedHost(requestHost, allowedHosts))
+    {
+        context.Response.StatusCode = StatusCodes.Status421MisdirectedRequest;
+        return;
+    }
+
+    string origin = context.Request.Headers.Origin.ToString().Trim();
+    if (!string.IsNullOrWhiteSpace(origin)
+        && !IsAllowedOrigin(origin, allowedOrigins))
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
         return;
     }
 
@@ -98,3 +126,34 @@ app.Use(async (context, next) =>
 
 app.MapMcp("/mcp");
 app.Run(listenUri);
+
+static HashSet<string> ParseList(string? value, params string[] defaults)
+{
+    IEnumerable<string> entries = string.IsNullOrWhiteSpace(value)
+        ? defaults
+        : value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    return new HashSet<string>(entries, StringComparer.OrdinalIgnoreCase);
+}
+
+static bool IsAllowedHost(string requestHost, IReadOnlySet<string> allowedHosts)
+{
+    string normalizedHost = requestHost.Trim().TrimEnd('.');
+    if (allowedHosts.Contains(normalizedHost))
+    {
+        return true;
+    }
+
+    return allowedHosts.Contains(requestHost.Trim());
+}
+
+static bool IsAllowedOrigin(string origin, IReadOnlySet<string> allowedOrigins)
+{
+    if (!Uri.TryCreate(origin, UriKind.Absolute, out Uri? originUri))
+    {
+        return false;
+    }
+
+    string normalized = originUri.GetLeftPart(UriPartial.Authority).TrimEnd('/');
+    return allowedOrigins.Contains(normalized);
+}
