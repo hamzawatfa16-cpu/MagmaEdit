@@ -1,6 +1,5 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Layout;
 using Avalonia.Themes.Fluent;
 using MagmaEdit.Auth;
 using MagmaEdit.Core.Media;
@@ -37,10 +36,10 @@ public sealed class App : Application, IAsyncDisposable
         try
         {
             _authService = CreateAuthService();
-            AuthResult restored = await _authService.RestoreSessionAsync().ConfigureAwait(false);
+            AuthResult restored = await _authService.RestoreSessionAsync();
             if (!restored.Succeeded)
             {
-                await ShowAuthWindowAsync(desktop).ConfigureAwait(false);
+                ShowAuthWindow(desktop);
                 return;
             }
 
@@ -53,7 +52,7 @@ public sealed class App : Application, IAsyncDisposable
         }
     }
 
-    private async Task ShowAuthWindowAsync(
+    private void ShowAuthWindow(
         Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
     {
         if (_authService is null)
@@ -65,7 +64,6 @@ public sealed class App : Application, IAsyncDisposable
         var authWindow = new AuthWindow(_authService, () => OpenEditor(desktop));
         desktop.MainWindow = authWindow;
         authWindow.Show();
-        await Task.CompletedTask.ConfigureAwait(true);
     }
 
     private void OpenEditor(
@@ -76,6 +74,7 @@ public sealed class App : Application, IAsyncDisposable
             return;
         }
 
+        Window? previousWindow = desktop.MainWindow;
         IMediaProbeService mediaProbeService = new SprocketMediaProbeService();
         var window = new MainWindow(mediaProbeService);
         desktop.MainWindow = window;
@@ -91,11 +90,7 @@ public sealed class App : Application, IAsyncDisposable
         TryAttach("plugin runtime", () => StartPluginRuntime(window));
         TryAttach("live editor IPC", () => _liveEditorPipeServer = new LiveEditorPipeServer(window));
         window.Show();
-
-        if (desktop.MainWindow is AuthWindow)
-        {
-            desktop.MainWindow.Close();
-        }
+        previousWindow?.Close();
     }
 
     private static IAuthService CreateAuthService()
