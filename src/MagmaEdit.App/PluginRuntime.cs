@@ -35,25 +35,62 @@ internal sealed class PluginRuntime : IAsyncDisposable
         return new PluginRuntime(manager, discovery);
     }
 
-    public async Task LoadDiscoveredPluginsAsync(
+    public bool IsLoaded(string pluginId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(pluginId);
+        return _manager.LoadedPluginIds.Contains(pluginId, StringComparer.Ordinal);
+    }
+
+    public async Task<bool> LoadPluginAsync(
+        PluginDescriptor descriptor,
         Action<string> report,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(descriptor);
         ArgumentNullException.ThrowIfNull(report);
+        cancellationToken.ThrowIfCancellationRequested();
 
-        foreach (PluginDescriptor descriptor in _discovery.Plugins)
+        if (IsLoaded(descriptor.Manifest.Id))
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            return true;
+        }
 
-            try
+        try
+        {
+            await _manager.LoadAsync(descriptor, cancellationToken).ConfigureAwait(false);
+            report($"Loaded plugin: {descriptor.Manifest.Name}");
+            return true;
+        }
+        catch (Exception exception) when (exception is FileLoadException or FileNotFoundException or BadImageFormatException or InvalidDataException or ArgumentException or InvalidOperationException or IOException)
+        {
+            report($"Plugin failed to load: {descriptor.Manifest.Name}: {exception.Message}");
+            return false;
+        }
+    }
+
+    public async Task<bool> UnloadPluginAsync(
+        string pluginId,
+        Action<string> report,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(pluginId);
+        ArgumentNullException.ThrowIfNull(report);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        try
+        {
+            bool unloaded = await _manager.UnloadAsync(pluginId, cancellationToken).ConfigureAwait(false);
+            if (unloaded)
             {
-                await _manager.LoadAsync(descriptor, cancellationToken).ConfigureAwait(false);
-                report($"Loaded plugin: {descriptor.Manifest.Name}");
+                report($"Unloaded plugin: {pluginId}");
             }
-            catch (Exception exception) when (exception is FileLoadException or FileNotFoundException or BadImageFormatException or InvalidDataException or ArgumentException or InvalidOperationException or IOException)
-            {
-                report($"Plugin failed to load: {descriptor.Manifest.Name}: {exception.Message}");
-            }
+
+            return unloaded;
+        }
+        catch (Exception exception) when (exception is FileLoadException or FileNotFoundException or BadImageFormatException or InvalidDataException or ArgumentException or InvalidOperationException or IOException)
+        {
+            report($"Plugin failed to unload: {pluginId}: {exception.Message}");
+            return false;
         }
     }
 
