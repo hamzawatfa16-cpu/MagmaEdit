@@ -6,7 +6,8 @@ public sealed record WorkspaceLayout(
     string Media,
     string Projects,
     string Exports,
-    string Cache)
+    string Cache,
+    string Plugins)
 {
     public const string WorkspaceFolderName = "Content Creation";
 
@@ -34,6 +35,7 @@ public sealed record WorkspaceLayout(
             Path.Combine(root, "Media"),
             Path.Combine(root, "Projects"),
             Path.Combine(root, "Exports"),
-            Path.Combine(root, "Cache"));
+            Path.Combine(root, "Cache"),
+            Path.Combine(root, "Plugins"));
     }
 }
