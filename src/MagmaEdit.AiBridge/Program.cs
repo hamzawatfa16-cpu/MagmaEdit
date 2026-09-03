@@ -40,7 +40,9 @@ app.MapPost("/v1/edit", async (
     }
     catch (InvalidOperationException exception)
     {
-        return Results.StatusCode(StatusCodes.Status409Conflict, new { error = exception.Message });
+        return Results.Json(
+            new { error = exception.Message },
+            statusCode: StatusCodes.Status409Conflict);
     }
     catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
     {
