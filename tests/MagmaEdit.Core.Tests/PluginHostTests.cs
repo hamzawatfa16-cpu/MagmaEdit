@@ -88,6 +88,9 @@ public sealed class PluginHostTests
         }
         finally
         {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
             Directory.Delete(pluginRoot, recursive: true);
         }
     }
