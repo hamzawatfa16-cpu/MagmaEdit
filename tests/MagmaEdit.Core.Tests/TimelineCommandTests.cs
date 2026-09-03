@@ -103,6 +103,43 @@ public sealed class TimelineCommandTests
     }
 
     [Fact]
+    public void MoveClipCommandSupportsUndoAndRedo()
+    {
+        TimelineDocument timeline = TimelineDocument.CreateDefault();
+        TimelineTrack track = timeline.AddTrack("Video 1");
+        TimelineEditor editor = new(timeline);
+        TimelineClip clip = editor.InsertClip(track.Id, "media", EditTime.Zero, EditTime.Zero, EditTime.FromSeconds(4));
+        EditHistory history = new();
+        MoveTimelineClipCommand command = new(editor, track.Id, clip.Id, EditTime.FromSeconds(8));
+
+        history.Execute(command);
+        Assert.Equal(EditTime.FromSeconds(8), clip.TimelineStart);
+        Assert.Equal(EditTime.FromSeconds(12), clip.TimelineEnd);
+
+        Assert.True(history.Undo());
+        Assert.Equal(EditTime.Zero, clip.TimelineStart);
+        Assert.Equal(EditTime.FromSeconds(4), clip.TimelineEnd);
+
+        Assert.True(history.Redo());
+        Assert.Equal(EditTime.FromSeconds(8), clip.TimelineStart);
+    }
+
+    [Fact]
+    public void MoveClipCommandRejectsOverlapWithoutChangingClip()
+    {
+        TimelineDocument timeline = TimelineDocument.CreateDefault();
+        TimelineTrack track = timeline.AddTrack("Video 1");
+        TimelineEditor editor = new(timeline);
+        TimelineClip moving = editor.InsertClip(track.Id, "media-1", EditTime.Zero, EditTime.Zero, EditTime.FromSeconds(4));
+        editor.InsertClip(track.Id, "media-2", EditTime.FromSeconds(8), EditTime.Zero, EditTime.FromSeconds(4));
+        MoveTimelineClipCommand command = new(editor, track.Id, moving.Id, EditTime.FromSeconds(9));
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => command.Apply());
+        Assert.Equal("The clip would overlap another clip on the same track.", exception.Message);
+        Assert.Equal(EditTime.Zero, moving.TimelineStart);
+    }
+
+    [Fact]
     public void SplitClipCommandSupportsUndoAndRedo()
     {
         TimelineDocument timeline = TimelineDocument.CreateDefault();
