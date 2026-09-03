@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using ModelContextProtocol.Server;
@@ -37,8 +38,16 @@ await builder.Build().RunAsync();
 [McpServerToolType]
 public sealed class MagmaEditTools
 {
-    [McpServerTool]
+    [McpServerTool(
+        Name = MagmaEdit.Integration.McpEditorToolContract.ExecuteEditorCommandToolName,
+        Title = "Execute MagmaEdit editor command",
+        ReadOnly = false,
+        Destructive = true,
+        Idempotent = false,
+        OpenWorld = false)]
+    [Description("Execute one validated and authorized MagmaEdit editor command against the configured project.")]
     public static MagmaEdit.Integration.EditorCommandResult ExecuteEditorCommand(
+        [Description("The MagmaEdit editor command and its command-specific parameters.")]
         MagmaEdit.Integration.EditorCommandRequest request,
         MagmaEdit.Integration.EditorAutomationSession session)
     {
