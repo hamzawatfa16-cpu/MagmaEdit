@@ -22,9 +22,9 @@ internal sealed class LiveEditorPipeServer : IAsyncDisposable
 
     private async Task RunAsync()
     {
-        try
+        while (!_shutdown.IsCancellationRequested)
         {
-            while (!_shutdown.IsCancellationRequested)
+            try
             {
                 await using var server = new NamedPipeServerStream(
                     LiveEditorPipeProtocol.PipeName,
@@ -36,13 +36,18 @@ internal sealed class LiveEditorPipeServer : IAsyncDisposable
                 await server.WaitForConnectionAsync(_shutdown.Token).ConfigureAwait(false);
                 await HandleConnectionAsync(server, _shutdown.Token).ConfigureAwait(false);
             }
-        }
-        catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
-        {
-        }
-        catch (Exception exception)
-        {
-            StartupDiagnostics.WriteComponentFailure("live editor pipe", exception);
+            catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception exception)
+            {
+                StartupDiagnostics.WriteComponentFailure("live editor pipe connection", exception);
+                if (!_shutdown.IsCancellationRequested)
+                {
+                    await Task.Yield();
+                }
+            }
         }
     }
 
@@ -114,6 +119,10 @@ internal sealed class LiveEditorPipeServer : IAsyncDisposable
             return Failure(exception.Message);
         }
         catch (IOException exception)
+        {
+            return Failure(exception.Message);
+        }
+        catch (UnauthorizedAccessException exception)
         {
             return Failure(exception.Message);
         }
