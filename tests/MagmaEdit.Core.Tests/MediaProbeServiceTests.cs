@@ -1,11 +1,10 @@
-using MagmaEdit.Core.Media;
 using MagmaEdit.Media.Sprocket;
 
 namespace MagmaEdit.Core.Tests;
 
 public sealed class MediaProbeServiceTests
 {
-    private readonly IMediaProbeService _probeService = new SprocketMediaProbeService();
+    private readonly SprocketMediaProbeService _probeService = new();
 
     [Fact]
     public void ProbeRejectsMissingFile()
