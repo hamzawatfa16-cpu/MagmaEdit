@@ -17,6 +17,11 @@ public sealed class EditorCommandRouter
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        if (!EditorCommandCatalog.TryValidate(request, out string validationMessage))
+        {
+            return Failure(validationMessage);
+        }
+
         try
         {
             return request.Command switch
