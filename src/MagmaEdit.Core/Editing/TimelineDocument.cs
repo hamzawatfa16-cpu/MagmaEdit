@@ -92,6 +92,13 @@ public sealed class TimelineDocument
         return track;
     }
 
+    public TimelineTrack RemoveTrack(string trackId)
+    {
+        TimelineTrack track = GetTrack(trackId);
+        Tracks.Remove(track);
+        return track;
+    }
+
     public TimelineTrack GetTrack(string trackId) =>
         Tracks.FirstOrDefault(track => string.Equals(track.Id, trackId, StringComparison.Ordinal))
         ?? throw new KeyNotFoundException($"Timeline track '{trackId}' does not exist.");
