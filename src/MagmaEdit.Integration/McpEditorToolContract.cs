@@ -5,6 +5,7 @@ public sealed record McpToolDefinition(
     string Name,
     string Description,
     string InputContract,
+    IReadOnlyList<EditorCommandKind> Commands,
     IReadOnlyList<EditorCommandCapability> Capabilities);
 
 /// <summary>Owns the stable MCP-facing command contract without coupling the editor core to an MCP SDK.</summary>
@@ -17,6 +18,7 @@ public static class McpEditorToolContract
         ExecuteEditorCommandToolName,
         "Validate, authorize, and execute one MagmaEdit editor command through the shared command boundary.",
         $"EditorCommandRequest/v{ContractVersion}",
+        Enum.GetValues<EditorCommandKind>(),
         [
             EditorCommandCapability.TimelineEditing,
             EditorCommandCapability.MediaManagement,
