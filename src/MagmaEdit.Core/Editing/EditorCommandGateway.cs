@@ -16,7 +16,7 @@ public sealed class EditorCommandGateway : IEditorCommandGateway
         _timeline = project.Timeline;
         _timelineEditor = new TimelineEditor(_timeline);
         _media = project.Media;
-        History = history ?? new EditHistory();
+        History = history ?? project.EditHistory;
     }
 
     public EditHistory History { get; }
