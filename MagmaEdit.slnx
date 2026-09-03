@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/MagmaEdit.Core/MagmaEdit.Core.csproj" />
     <Project Path="src/MagmaEdit.Integration/MagmaEdit.Integration.csproj" />
+    <Project Path="src/MagmaEdit.Plugin.Abstractions/MagmaEdit.Plugin.Abstractions.csproj" />
     <Project Path="src/MagmaEdit.Media.Sprocket/MagmaEdit.Media.Sprocket.csproj" />
     <Project Path="src/MagmaEdit.App/MagmaEdit.App.csproj" />
     <Project Path="third_party/sprocket/src/Sprocket.Core/Sprocket.Core.csproj" />
