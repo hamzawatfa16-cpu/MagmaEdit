@@ -71,6 +71,36 @@ public sealed class EditorCommandGatewayTests
     }
 
     [Fact]
+    public void GatewayCanDuplicateClipAtEndAndUndoIt()
+    {
+        ProjectDocument project = ProjectDocument.Create("Duplicate Test");
+        EditorCommandGateway gateway = new(project);
+        TimelineTrack track = gateway.AddTrack("Video 1");
+        TimelineClip original = gateway.InsertClip(
+            track.Id,
+            "media-1",
+            EditTime.Zero,
+            EditTime.FromSeconds(1),
+            EditTime.FromSeconds(4));
+
+        TimelineClip duplicate = gateway.DuplicateClip(track.Id, original.Id);
+
+        Assert.Equal(2, track.Clips.Count);
+        Assert.NotEqual(original.Id, duplicate.Id);
+        Assert.Equal(original.MediaId, duplicate.MediaId);
+        Assert.Equal(original.SourceIn, duplicate.SourceIn);
+        Assert.Equal(original.SourceOut, duplicate.SourceOut);
+        Assert.Equal(EditTime.FromSeconds(3), original.Duration);
+        Assert.Equal(original.TimelineEnd, duplicate.TimelineStart);
+
+        Assert.True(gateway.Undo());
+        Assert.Single(track.Clips);
+        Assert.Equal(original.Id, track.Clips[0].Id);
+        Assert.True(gateway.Redo());
+        Assert.Equal(2, track.Clips.Count);
+    }
+
+    [Fact]
     public void GatewayMediaOperationsAreUndoable()
     {
         ProjectDocument project = ProjectDocument.Create("Gateway Test");
