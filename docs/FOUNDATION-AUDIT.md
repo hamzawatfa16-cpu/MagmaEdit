@@ -19,6 +19,7 @@ MagmaEdit currently contains:
 - A shared `IEditorCommandGateway` so editor mutations can be exposed through one command path.
 - Undoable media-collection and timeline operations with regression tests.
 - A vendor-neutral `MagmaEdit.Integration` command contract and router for future AI/plugin clients.
+- A MagmaEdit-owned plugin abstraction and collectible plugin host with manifest validation, per-plugin data directories, lifecycle handling, and regression tests.
 - Strict nullable/analyzer/format/build/test gates in CI, including Windows publishing and installer creation.
 - A pinned Sprocket submodule whose revision is verified by CI.
 
@@ -28,11 +29,10 @@ The following are planned but are not currently present as finished MagmaEdit-ow
 
 1. Authentication and account/session UI.
 2. A MagmaEdit-owned MCP server/tool surface.
-3. A MagmaEdit-owned plugin host/API and plugin lifecycle model.
-4. A hosted AI bridge for external AI clients.
-5. Complete migration of the desktop UI away from direct project-model mutations and its private history instance.
-6. Full replacement of upstream/Sprocket implementation details behind MagmaEdit-owned interfaces.
-7. Final product branding, assets, packaging identity, and release polish.
+3. A hosted AI bridge for external AI clients.
+4. Complete migration of the desktop UI away from direct project-model mutations and its private history instance.
+5. Full replacement of upstream/Sprocket implementation details behind MagmaEdit-owned interfaces.
+6. Final product branding, assets, packaging identity, and release polish.
 
 These items must not be described as already implemented until the corresponding code and tests exist in this repository.
 
@@ -47,6 +47,8 @@ The intended dependency direction is:
 `MagmaEdit.Integration` -> `MagmaEdit.Core`
 
 `MagmaEdit.Media.Sprocket` -> `MagmaEdit.Core` + upstream Sprocket implementation
+
+`MagmaEdit.PluginHost` -> `MagmaEdit.Plugin.Abstractions`
 
 Future MCP/plugin/hosted integrations must depend on the vendor-neutral command boundary rather than introducing vendor-specific concepts into Core.
 
@@ -73,7 +75,7 @@ The next implementation work should proceed in this order:
 
 1. Complete the command-gateway migration in the desktop application so direct timeline/media mutations are removed from UI code where an equivalent gateway operation exists.
 2. Strengthen the vendor-neutral integration boundary with explicit validation and capability metadata needed by future plugins and MCP tools.
-3. Define the MagmaEdit-owned plugin contract and lifecycle without loading third-party plugins into the Core process.
+3. Harden the MagmaEdit-owned plugin host with failure-safe lifecycle cleanup and additional isolation tests.
 4. Define the MagmaEdit-owned MCP tool contract and authorization boundary.
 5. Build authentication/session infrastructure after the local editor command path is stable.
 6. Gradually replace or isolate remaining upstream implementation details while maintaining required licenses/notices.
