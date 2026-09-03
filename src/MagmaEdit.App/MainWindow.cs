@@ -40,8 +40,11 @@ public sealed class MainWindow : Window
     private Button? _removeClipButton;
     private Button? _splitClipButton;
     private Button? _trimClipButton;
+    private Button? _removeTrackButton;
+    private Button? _moveClipButton;
     private TextBox? _trimSourceInBox;
     private TextBox? _trimSourceOutBox;
+    private TextBox? _moveTimelineStartBox;
     private Bitmap? _previewBitmap;
     private int _previewGeneration;
     private MediaGalleryController? _mediaGallery;
@@ -244,6 +247,10 @@ public sealed class MainWindow : Window
         addTrackButton.Click += (_, _) => AddTrack();
         header.Children.Add(addTrackButton);
 
+        _removeTrackButton = new Button { Content = "Remove Selected Track", IsEnabled = false };
+        _removeTrackButton.Click += (_, _) => RemoveSelectedTrack();
+        header.Children.Add(_removeTrackButton);
+
         Grid.SetColumnSpan(header, 3);
         root.Children.Add(header);
 
@@ -349,6 +356,30 @@ public sealed class MainWindow : Window
             }
         };
 
+        _moveTimelineStartBox = new TextBox
+        {
+            PlaceholderText = "Timeline position (seconds)",
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        _moveClipButton = new Button
+        {
+            Content = "Move Selected Clip",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            IsEnabled = false
+        };
+        _moveClipButton.Click += (_, _) => MoveSelectedClip();
+
+        var movePanel = new StackPanel
+        {
+            Spacing = 6,
+            Children =
+            {
+                new TextBlock { Text = "Timeline position", FontWeight = FontWeight.SemiBold },
+                _moveTimelineStartBox,
+                _moveClipButton
+            }
+        };
+
         var inspector = new Border
         {
             Padding = new Thickness(12),
@@ -365,7 +396,8 @@ public sealed class MainWindow : Window
                         _addToTimelineButton,
                         _removeClipButton,
                         _splitClipButton,
-                        trimPanel
+                        trimPanel,
+                        movePanel
                     }
                 }
             }
@@ -645,6 +677,49 @@ public sealed class MainWindow : Window
         UpdateClipActionButtons();
     }
 
+    private void RemoveSelectedTrack()
+    {
+        TimelineTrack? track = _selectedTrack;
+        if (track is null)
+        {
+            _statusText.Text = "Select a timeline track first.";
+            return;
+        }
+
+        if (_project.Timeline.Tracks.Count <= 1)
+        {
+            _statusText.Text = "MagmaEdit keeps at least one timeline track.";
+            UpdateClipActionButtons();
+            return;
+        }
+
+        if (!_project.Timeline.Tracks.Any(existing => string.Equals(existing.Id, track.Id, StringComparison.Ordinal)))
+        {
+            _selectedTrack = _project.Timeline.Tracks.FirstOrDefault();
+            _selectedClip = null;
+            RefreshTimeline();
+            UpdateClipActionButtons();
+            return;
+        }
+
+        try
+        {
+            _history.Execute(new RemoveTimelineTrackCommand(_project.Timeline, track.Id));
+        }
+        catch (KeyNotFoundException exception)
+        {
+            _statusText.Text = exception.Message;
+            return;
+        }
+
+        _selectedTrack = _project.Timeline.Tracks.FirstOrDefault();
+        _selectedClip = null;
+        SaveProject();
+        _statusText.Text = $"Removed track: {track.Name}";
+        UpdateHistoryButtons();
+        UpdateClipActionButtons();
+    }
+
     private void AddSelectedMediaToTimeline()
     {
         MediaAsset? asset = _selectedMedia;
@@ -703,6 +778,67 @@ public sealed class MainWindow : Window
             string.Equals(clip.Id, command.Clip.Id, StringComparison.Ordinal));
         SaveProject();
         _statusText.Text = $"Added {asset.FileName} to {track.Name}.";
+        UpdateHistoryButtons();
+        UpdateClipActionButtons();
+    }
+
+    private void MoveSelectedClip()
+    {
+        TimelineTrack? track = _selectedTrack;
+        TimelineClip? clip = _selectedClip;
+        if (track is null || clip is null || _moveTimelineStartBox is null)
+        {
+            _statusText.Text = "Select a timeline clip first.";
+            return;
+        }
+
+        if (!double.TryParse(_moveTimelineStartBox.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out double timelineStartSeconds) ||
+            !double.IsFinite(timelineStartSeconds) || timelineStartSeconds < 0)
+        {
+            _statusText.Text = "Enter a finite, non-negative timeline position in seconds.";
+            return;
+        }
+
+        EditTime timelineStart;
+        try
+        {
+            timelineStart = EditTime.FromSeconds(timelineStartSeconds);
+        }
+        catch (ArgumentOutOfRangeException exception)
+        {
+            _statusText.Text = $"Enter a timeline position within the supported time limit: {exception.Message}";
+            return;
+        }
+        catch (OverflowException exception)
+        {
+            _statusText.Text = $"Enter a timeline position within the supported time limit: {exception.Message}";
+            return;
+        }
+
+        if (timelineStart == clip.TimelineStart)
+        {
+            _statusText.Text = "The selected clip is already at that timeline position.";
+            return;
+        }
+
+        try
+        {
+            _history.Execute(new MoveTimelineClipCommand(
+                new TimelineEditor(_project.Timeline),
+                track.Id,
+                clip.Id,
+                timelineStart));
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or KeyNotFoundException or ArgumentOutOfRangeException)
+        {
+            _statusText.Text = $"Could not move clip: {exception.Message}";
+            return;
+        }
+
+        _selectedClip = track.Clips.FirstOrDefault(candidate =>
+            string.Equals(candidate.Id, clip.Id, StringComparison.Ordinal));
+        SaveProject();
+        _statusText.Text = $"Moved clip on {track.Name}.";
         UpdateHistoryButtons();
         UpdateClipActionButtons();
     }
@@ -921,10 +1057,27 @@ public sealed class MainWindow : Window
             _trimClipButton.IsEnabled = clipSelected;
         }
 
+        if (_moveClipButton is not null)
+        {
+            _moveClipButton.IsEnabled = clipSelected;
+        }
+
+        if (_removeTrackButton is not null)
+        {
+            _removeTrackButton.IsEnabled = _selectedTrack is not null && _project.Timeline.Tracks.Count > 1;
+        }
+
         if (_trimSourceInBox is not null && _trimSourceOutBox is not null && clipSelected)
         {
             _trimSourceInBox.Text = _selectedClip!.SourceIn.ToSeconds().ToString("0.###", CultureInfo.InvariantCulture);
             _trimSourceOutBox.Text = _selectedClip.SourceOut.ToSeconds().ToString("0.###", CultureInfo.InvariantCulture);
+        }
+
+        if (_moveTimelineStartBox is not null)
+        {
+            _moveTimelineStartBox.Text = clipSelected
+                ? _selectedClip!.TimelineStart.ToSeconds().ToString("0.###", CultureInfo.InvariantCulture)
+                : string.Empty;
         }
     }
 
