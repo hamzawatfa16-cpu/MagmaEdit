@@ -18,6 +18,8 @@ public interface IEditorCommandGateway
         EditTime sourceIn,
         EditTime sourceOut);
 
+    TimelineClip DuplicateClip(string trackId, string clipId);
+
     void RemoveClip(string trackId, string clipId);
 
     void TrimClip(string trackId, string clipId, EditTime sourceIn, EditTime sourceOut);
