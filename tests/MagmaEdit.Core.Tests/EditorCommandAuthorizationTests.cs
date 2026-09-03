@@ -82,6 +82,9 @@ public sealed class EditorCommandAuthorizationTests
             McpEditorToolContract.ExecuteEditorCommand,
             McpEditorToolContract.Definitions[0]);
         Assert.Equal(
+            Enum.GetValues<EditorCommandKind>(),
+            McpEditorToolContract.ExecuteEditorCommand.Commands);
+        Assert.Equal(
             [
                 EditorCommandCapability.TimelineEditing,
                 EditorCommandCapability.MediaManagement,
