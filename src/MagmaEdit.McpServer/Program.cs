@@ -35,6 +35,8 @@ builder.Services
 
 await builder.Build().RunAsync();
 
+namespace MagmaEdit.McpServer;
+
 [McpServerToolType]
 public sealed class MagmaEditTools
 {
