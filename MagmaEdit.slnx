@@ -14,6 +14,7 @@
     <Project Path="third_party/sprocket/src/Sprocket.Playback/Sprocket.Playback.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/MagmaEdit.Auth.Tests/MagmaEdit.Auth.Tests.csproj" />
     <Project Path="tests/MagmaEdit.Core.Tests/MagmaEdit.Core.Tests.csproj" />
     <Project Path="tests/MagmaEdit.PluginHost.TestPlugin/MagmaEdit.PluginHost.TestPlugin.csproj" />
   </Folder>
