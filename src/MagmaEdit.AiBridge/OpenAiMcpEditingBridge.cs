@@ -80,13 +80,6 @@ public sealed partial class OpenAiMcpEditingBridge
             response.OutputItems.Count);
     }
 
-    public Task<AiBridgeResult> EditAsync(
-        AiEditRequest request,
-        CancellationToken cancellationToken)
-    {
-        return EditAsync(request, "legacy", cancellationToken);
-    }
-
     private static string BuildPrompt(AiEditRequest request)
     {
         const string policy = "You are MagmaEdit's editing assistant. Use only the provided MagmaEdit MCP tools for editor state or editor mutations. Do not invent project state. Before making a mutation, reason from the current editor state. Keep edits inside the user's requested scope. After completing requested edits, briefly report what changed.";
