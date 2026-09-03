@@ -147,12 +147,17 @@ public sealed class LoadedPlugin : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        if (!_shutdown)
+        try
         {
-            _shutdown = true;
-            await _plugin.ShutdownAsync().ConfigureAwait(false);
+            if (!_shutdown)
+            {
+                _shutdown = true;
+                await _plugin.ShutdownAsync().ConfigureAwait(false);
+            }
         }
-
-        _loadContext.Unload();
+        finally
+        {
+            _loadContext.Unload();
+        }
     }
 }
