@@ -17,10 +17,13 @@ The host provides:
 - explicit initialize/shutdown lifecycle
 - safe unloading even when plugin shutdown reports an error
 - `PluginManager` lifecycle ownership for multiple explicitly loaded plugins
+- an in-app plugin manager that requires explicit approval before a discovered plugin is loaded
 
 ## Security boundary
 
-Discovery is not execution. MagmaEdit must not automatically execute every DLL found in the plugin directory. A future UI can present discovered plugins and require explicit user approval before calling `PluginManager.LoadAsync`.
+Discovery is not execution. MagmaEdit discovers DLLs but does not automatically execute them. The desktop application opens the plugin manager when plugins are discovered so the user can review each plugin's name, publisher, version, identifier, and requested capabilities before choosing **Approve & Load**.
+
+A discovered plugin remains inert until the user explicitly loads it. Loaded plugins can later be unloaded from the same manager.
 
 Plugins only receive the interfaces declared in `MagmaEdit.Plugin.Abstractions`. They do not receive direct access to the mutable Core project model.
 
