@@ -24,9 +24,19 @@ public sealed class PluginCatalog
         var issues = new List<PluginDiscoveryIssue>();
         var knownIds = new HashSet<string>(StringComparer.Ordinal);
 
-        IEnumerable<string> assemblies = Directory
-            .EnumerateFiles(fullRoot, "*.dll", SearchOption.AllDirectories)
-            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase);
+        string[] assemblies;
+        try
+        {
+            assemblies = Directory
+                .EnumerateFiles(fullRoot, "*.dll", SearchOption.AllDirectories)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+        catch (IOException exception)
+        {
+            issues.Add(new PluginDiscoveryIssue(fullRoot, exception.Message));
+            return new PluginDiscoveryResult(plugins, issues);
+        }
 
         foreach (string assemblyPath in assemblies)
         {
@@ -43,7 +53,7 @@ public sealed class PluginCatalog
 
                 plugins.Add(new PluginDescriptor(assemblyPath, manifest));
             }
-            catch (Exception exception) when (exception is FileLoadException or FileNotFoundException or BadImageFormatException or InvalidDataException or ArgumentException or IOException or UnauthorizedAccessException)
+            catch (Exception exception) when (exception is FileLoadException or FileNotFoundException or BadImageFormatException or InvalidDataException or ArgumentException or IOException)
             {
                 issues.Add(new PluginDiscoveryIssue(assemblyPath, exception.Message));
             }
