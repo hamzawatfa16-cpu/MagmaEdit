@@ -23,7 +23,7 @@ internal sealed class PluginRuntime : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(window);
 
-        WorkspaceLayout workspace = window.GetWorkspaceForPlugins();
+        WorkspaceLayout workspace = WorkspaceLayout.ForCurrentUser();
         PluginDiscoveryResult discovery = PluginCatalog.Discover(workspace.Plugins);
         var commands = new PluginEditorCommandAdapter(
             window.GetProjectForExport,
