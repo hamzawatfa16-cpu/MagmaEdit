@@ -29,8 +29,8 @@ public sealed class EditHistory
         }
 
         IEditCommand command = _undo[^1];
-        _undo.RemoveAt(_undo.Count - 1);
         command.Revert();
+        _undo.RemoveAt(_undo.Count - 1);
         _redo.Add(command);
         return true;
     }
@@ -43,8 +43,8 @@ public sealed class EditHistory
         }
 
         IEditCommand command = _redo[^1];
-        _redo.RemoveAt(_redo.Count - 1);
         command.Apply();
+        _redo.RemoveAt(_redo.Count - 1);
         _undo.Add(command);
         return true;
     }
