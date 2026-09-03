@@ -26,8 +26,6 @@ public interface IEditorCommandGateway
 
     void MoveClip(string trackId, string clipId, EditTime timelineStart);
 
-    void MoveClipToTrack(string sourceTrackId, string destinationTrackId, string clipId, EditTime timelineStart);
-
     void SplitClip(string trackId, string clipId, EditTime timelinePosition);
 
     MediaAsset AddMedia(MediaAsset asset);

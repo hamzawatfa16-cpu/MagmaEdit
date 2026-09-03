@@ -60,15 +60,6 @@ public static class EditorCommandCatalog
                 EditorCommandKind.MoveClip,
                 EditorCommandCapability.TimelineEditing,
                 [nameof(EditorCommandRequest.TrackId), nameof(EditorCommandRequest.ClipId), nameof(EditorCommandRequest.TimelinePositionTicks)]),
-            [EditorCommandKind.MoveClipToTrack] = new(
-                EditorCommandKind.MoveClipToTrack,
-                EditorCommandCapability.TimelineEditing,
-                [
-                    nameof(EditorCommandRequest.TrackId),
-                    nameof(EditorCommandRequest.DestinationTrackId),
-                    nameof(EditorCommandRequest.ClipId),
-                    nameof(EditorCommandRequest.TimelinePositionTicks)
-                ]),
             [EditorCommandKind.SplitClip] = new(
                 EditorCommandKind.SplitClip,
                 EditorCommandCapability.TimelineEditing,
@@ -114,7 +105,6 @@ public static class EditorCommandCatalog
             string? value = parameter switch
             {
                 nameof(EditorCommandRequest.TrackId) => request.TrackId,
-                nameof(EditorCommandRequest.DestinationTrackId) => request.DestinationTrackId,
                 nameof(EditorCommandRequest.ClipId) => request.ClipId,
                 nameof(EditorCommandRequest.MediaId) => request.MediaId,
                 nameof(EditorCommandRequest.Name) => request.Name,
@@ -173,7 +163,6 @@ public static class EditorCommandCatalog
                 return true;
 
             case EditorCommandKind.MoveClip:
-            case EditorCommandKind.MoveClipToTrack:
             case EditorCommandKind.SplitClip:
                 return TryParseTicks(request.TimelinePositionTicks, nameof(EditorCommandRequest.TimelinePositionTicks), out _, out message);
 

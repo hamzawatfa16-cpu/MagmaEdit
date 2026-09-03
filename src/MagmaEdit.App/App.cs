@@ -89,7 +89,6 @@ public sealed class App : Application, IAsyncDisposable
         TryAttach("update controller", () => _ = UpdateController.Attach(window));
         TryAttach("plugin runtime", () => StartPluginRuntime(window));
         TryAttach("live editor IPC", () => _liveEditorPipeServer = new LiveEditorPipeServer(window));
-        TryAttach("timeline drag-and-drop", () => TimelineDragController.Attach(window));
         window.Show();
         previousWindow?.Close();
     }

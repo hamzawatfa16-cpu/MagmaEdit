@@ -33,7 +33,6 @@ public sealed class EditorCommandRouter
                 EditorCommandKind.RemoveClip => RemoveClip(request),
                 EditorCommandKind.TrimClip => TrimClip(request),
                 EditorCommandKind.MoveClip => MoveClip(request),
-                EditorCommandKind.MoveClipToTrack => MoveClipToTrack(request),
                 EditorCommandKind.SplitClip => SplitClip(request),
                 EditorCommandKind.RenameMedia => RenameMedia(request),
                 EditorCommandKind.SetMediaPublished => SetMediaPublished(request),
@@ -119,19 +118,6 @@ public sealed class EditorCommandRouter
         EditTime timelinePosition = ParseTime(request.TimelinePositionTicks, nameof(request.TimelinePositionTicks));
         _gateway.MoveClip(trackId, clipId, timelinePosition);
         return Success("Clip moved.", trackId: trackId, clipId: clipId);
-    }
-
-    private EditorCommandResult MoveClipToTrack(EditorCommandRequest request)
-    {
-        string sourceTrackId = Required(request.TrackId, nameof(request.TrackId));
-        string destinationTrackId = Required(request.DestinationTrackId, nameof(request.DestinationTrackId));
-        string clipId = Required(request.ClipId, nameof(request.ClipId));
-        EditTime timelinePosition = ParseTime(request.TimelinePositionTicks, nameof(request.TimelinePositionTicks));
-        _gateway.MoveClipToTrack(sourceTrackId, destinationTrackId, clipId, timelinePosition);
-        return Success(
-            "Clip moved to another track.",
-            trackId: destinationTrackId,
-            clipId: clipId);
     }
 
     private EditorCommandResult SplitClip(EditorCommandRequest request)

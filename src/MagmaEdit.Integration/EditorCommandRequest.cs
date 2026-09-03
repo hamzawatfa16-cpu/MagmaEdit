@@ -6,7 +6,6 @@ namespace MagmaEdit.Integration;
 public sealed record EditorCommandRequest(
     EditorCommandKind Command,
     string? TrackId = null,
-    string? DestinationTrackId = null,
     string? ClipId = null,
     string? MediaId = null,
     string? Name = null,
@@ -24,7 +23,6 @@ public enum EditorCommandKind
     RemoveClip,
     TrimClip,
     MoveClip,
-    MoveClipToTrack,
     SplitClip,
     RenameMedia,
     SetMediaPublished,
