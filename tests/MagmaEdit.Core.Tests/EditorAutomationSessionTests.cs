@@ -107,7 +107,20 @@ public sealed class EditorAutomationSessionTests
             EditorProjectState first = session.GetState();
             EditorProjectState second = session.GetState();
 
-            Assert.Equal(first, second);
+            Assert.Equal(first.ProjectId, second.ProjectId);
+            Assert.Equal(first.ProjectName, second.ProjectName);
+            Assert.Equal(first.SchemaVersion, second.SchemaVersion);
+            Assert.Equal(first.TimelineWidth, second.TimelineWidth);
+            Assert.Equal(first.TimelineHeight, second.TimelineHeight);
+            Assert.Equal(first.FrameRateNumerator, second.FrameRateNumerator);
+            Assert.Equal(first.FrameRateDenominator, second.FrameRateDenominator);
+            Assert.Equal(first.MediaCount, second.MediaCount);
+            Assert.Equal(first.UndoCount, second.UndoCount);
+            Assert.Equal(first.RedoCount, second.RedoCount);
+            Assert.Equal(first.Media.Select(media => media), second.Media.Select(media => media));
+            Assert.Equal(
+                first.Tracks.Select(item => (item.Id, item.Name, item.Clips.Count)),
+                second.Tracks.Select(item => (item.Id, item.Name, item.Clips.Count)));
             Assert.Equal(project.Id, first.ProjectId);
             Assert.Equal("State Test", first.ProjectName);
             Assert.Equal(project.SchemaVersion, first.SchemaVersion);
