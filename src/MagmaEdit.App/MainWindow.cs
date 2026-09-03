@@ -26,6 +26,7 @@ public sealed class MainWindow : Window
     private readonly ProjectStore _projectStore;
     private readonly ProjectSession _projectSession;
     private readonly IMediaProbeService _mediaProbeService;
+    private IEditorCommandGateway _commandGateway;
     private ProjectDocument _project;
     private string _projectPath;
     private readonly StackPanel _mediaList;
@@ -34,7 +35,6 @@ public sealed class MainWindow : Window
     private readonly TextBlock _previewText;
     private readonly TextBlock _inspectorText;
     private readonly TextBlock _timelineInfoText;
-    private readonly EditHistory _history = new();
     private Button? _undoButton;
     private Button? _redoButton;
     private Button? _saveProjectButton;
@@ -72,6 +72,7 @@ public sealed class MainWindow : Window
         _projectSession = new ProjectSession(_workspace);
         _mediaProbeService = mediaProbeService;
         (_project, _projectPath) = LoadOrCreateProject();
+        _commandGateway = new EditorCommandGateway(_project);
 
         _mediaList = new StackPanel { Spacing = 6 };
         _timelineList = new StackPanel { Spacing = 8 };
@@ -137,14 +138,24 @@ public sealed class MainWindow : Window
             return false;
         }
 
-        bool removed = _project.Media.Remove(asset);
-        if (removed)
+        bool exists = _project.Media.Any(existing => string.Equals(existing.Id, asset.Id, StringComparison.Ordinal));
+        if (!exists)
         {
-            SaveProject();
-            _mediaGallery?.Refresh();
+            return false;
         }
 
-        return removed;
+        try
+        {
+            _commandGateway.RemoveMedia(asset.Id);
+        }
+        catch (KeyNotFoundException)
+        {
+            return false;
+        }
+
+        SaveProject();
+        _mediaGallery?.Refresh();
+        return true;
     }
 
     private (ProjectDocument Project, string Path) LoadOrCreateProject()
@@ -194,7 +205,7 @@ public sealed class MainWindow : Window
     {
         if (_project.Timeline.Tracks.Count == 0)
         {
-            _selectedTrack = _project.Timeline.AddTrack(DefaultTrackName);
+            _selectedTrack = _commandGateway.AddTrack(DefaultTrackName);
             SaveProject();
         }
         else
@@ -563,10 +574,10 @@ public sealed class MainWindow : Window
         _previewBitmap = null;
         _selectedMedia = null;
         _selectedClip = null;
-        _history.Clear();
 
         _project = project;
         _projectPath = Path.GetFullPath(path);
+        _commandGateway = new EditorCommandGateway(_project);
         _selectedTrack = _project.Timeline.Tracks.FirstOrDefault();
         EnsureTimelineTrack();
 
@@ -640,7 +651,7 @@ public sealed class MainWindow : Window
                 try
                 {
                     MediaAsset asset = importer.Import(normalizedSource);
-                    _project.Media.Add(asset);
+                    _commandGateway.AddMedia(asset);
                     lastImportedAsset = asset;
                     imported++;
                 }
@@ -672,9 +683,8 @@ public sealed class MainWindow : Window
 
     private void AddTrack()
     {
-        var command = new AddTimelineTrackCommand(_project.Timeline, $"Video {_project.Timeline.Tracks.Count + 1}");
-        _history.Execute(command);
-        _selectedTrack = command.Track;
+        TimelineTrack track = _commandGateway.AddTrack($"Video {_project.Timeline.Tracks.Count + 1}");
+        _selectedTrack = track;
         _selectedClip = null;
         SaveProject();
         _statusText.Text = $"Added track: {_selectedTrack.Name}";
@@ -709,7 +719,7 @@ public sealed class MainWindow : Window
 
         try
         {
-            _history.Execute(new RemoveTimelineTrackCommand(_project.Timeline, track.Id));
+            _commandGateway.RemoveTrack(track.Id);
         }
         catch (KeyNotFoundException exception)
         {
@@ -761,17 +771,15 @@ public sealed class MainWindow : Window
             return;
         }
 
-        var command = new InsertTimelineClipCommand(
-            new TimelineEditor(_project.Timeline),
-            track.Id,
-            asset.Id,
-            timelineStart,
-            EditTime.Zero,
-            duration);
-
+        TimelineClip insertedClip;
         try
         {
-            _history.Execute(command);
+            insertedClip = _commandGateway.InsertClip(
+                track.Id,
+                asset.Id,
+                timelineStart,
+                EditTime.Zero,
+                duration);
         }
         catch (Exception exception) when (exception is InvalidOperationException or ArgumentOutOfRangeException or OverflowException)
         {
@@ -779,8 +787,7 @@ public sealed class MainWindow : Window
             return;
         }
 
-        _selectedClip = track.Clips.FirstOrDefault(clip =>
-            string.Equals(clip.Id, command.Clip.Id, StringComparison.Ordinal));
+        _selectedClip = insertedClip;
         SaveProject();
         _statusText.Text = $"Added {asset.FileName} to {track.Name}.";
         UpdateHistoryButtons();
@@ -828,11 +835,7 @@ public sealed class MainWindow : Window
 
         try
         {
-            _history.Execute(new MoveTimelineClipCommand(
-                new TimelineEditor(_project.Timeline),
-                track.Id,
-                clip.Id,
-                timelineStart));
+            _commandGateway.MoveClip(track.Id, clip.Id, timelineStart);
         }
         catch (Exception exception) when (exception is InvalidOperationException or KeyNotFoundException or ArgumentOutOfRangeException)
         {
@@ -868,10 +871,7 @@ public sealed class MainWindow : Window
 
         try
         {
-            _history.Execute(new RemoveTimelineClipCommand(
-                new TimelineEditor(_project.Timeline),
-                track.Id,
-                clip.Id));
+            _commandGateway.RemoveClip(track.Id, clip.Id);
         }
         catch (KeyNotFoundException exception)
         {
@@ -903,15 +903,9 @@ public sealed class MainWindow : Window
             return;
         }
 
-        var command = new SplitTimelineClipCommand(
-            new TimelineEditor(_project.Timeline),
-            track.Id,
-            clip.Id,
-            midpoint);
-
         try
         {
-            _history.Execute(command);
+            _commandGateway.SplitClip(track.Id, clip.Id, midpoint);
         }
         catch (Exception exception) when (exception is InvalidOperationException or KeyNotFoundException or ArgumentOutOfRangeException)
         {
@@ -969,16 +963,9 @@ public sealed class MainWindow : Window
             return;
         }
 
-        var command = new TrimTimelineClipCommand(
-            new TimelineEditor(_project.Timeline),
-            track.Id,
-            clip.Id,
-            sourceIn,
-            sourceOut);
-
         try
         {
-            _history.Execute(command);
+            _commandGateway.TrimClip(track.Id, clip.Id, sourceIn, sourceOut);
         }
         catch (ArgumentOutOfRangeException exception)
         {
@@ -1001,7 +988,7 @@ public sealed class MainWindow : Window
 
     private void Undo()
     {
-        if (!_history.Undo())
+        if (!_commandGateway.Undo())
         {
             _statusText.Text = "Nothing to undo.";
             UpdateHistoryButtons();
@@ -1017,7 +1004,7 @@ public sealed class MainWindow : Window
 
     private void Redo()
     {
-        if (!_history.Redo())
+        if (!_commandGateway.Redo())
         {
             _statusText.Text = "Nothing to redo.";
             UpdateHistoryButtons();
@@ -1033,14 +1020,15 @@ public sealed class MainWindow : Window
 
     private void UpdateHistoryButtons()
     {
+        EditHistory history = _commandGateway.History;
         if (_undoButton is not null)
         {
-            _undoButton.IsEnabled = _history.CanUndo;
+            _undoButton.IsEnabled = history.CanUndo;
         }
 
         if (_redoButton is not null)
         {
-            _redoButton.IsEnabled = _history.CanRedo;
+            _redoButton.IsEnabled = history.CanRedo;
         }
     }
 
