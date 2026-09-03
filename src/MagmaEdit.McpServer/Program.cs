@@ -6,12 +6,6 @@ string? projectPath = args.Length == 1
     ? args[0]
     : Environment.GetEnvironmentVariable("MAGMAEDIT_PROJECT_PATH");
 
-if (string.IsNullOrWhiteSpace(projectPath))
-{
-    throw new InvalidOperationException(
-        "A MagmaEdit project path is required. Pass the project path as the first argument or set MAGMAEDIT_PROJECT_PATH.");
-}
-
 var client = new MagmaEdit.Integration.AutomationClientContext(
     "local-mcp",
     MagmaEdit.Integration.AutomationClientKind.Mcp,
@@ -22,11 +16,10 @@ var client = new MagmaEdit.Integration.AutomationClientContext(
         MagmaEdit.Integration.EditorCommandCapability.History
     });
 
-MagmaEdit.Integration.EditorAutomationSession session =
-    MagmaEdit.Integration.EditorAutomationSession.Load(projectPath, client);
+var target = new MagmaEditAutomationTarget(projectPath, client);
 
 HostApplicationBuilder builder = Host.CreateEmptyApplicationBuilder(settings: null);
-builder.Services.AddSingleton(session);
+builder.Services.AddSingleton(target);
 builder.Services
     .AddMcpServer()
     .WithStdioServerTransport()
