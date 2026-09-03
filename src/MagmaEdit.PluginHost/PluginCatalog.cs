@@ -43,7 +43,7 @@ public sealed class PluginCatalog
 
                 plugins.Add(new PluginDescriptor(assemblyPath, manifest));
             }
-            catch (Exception exception) when (exception is FileLoadException or FileNotFoundException or BadImageFormatException or InvalidDataException or ArgumentException)
+            catch (Exception exception) when (exception is FileLoadException or FileNotFoundException or BadImageFormatException or InvalidDataException or ArgumentException or IOException or UnauthorizedAccessException)
             {
                 issues.Add(new PluginDiscoveryIssue(assemblyPath, exception.Message));
             }
