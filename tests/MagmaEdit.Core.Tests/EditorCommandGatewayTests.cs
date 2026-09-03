@@ -101,6 +101,76 @@ public sealed class EditorCommandGatewayTests
     }
 
     [Fact]
+    public void GatewayCanMoveClipToAnotherTrackAndUndoIt()
+    {
+        ProjectDocument project = ProjectDocument.Create("Cross Track Move Test");
+        EditorCommandGateway gateway = new(project);
+        TimelineTrack sourceTrack = gateway.AddTrack("Video 1");
+        TimelineTrack destinationTrack = gateway.AddTrack("Video 2");
+        TimelineClip original = gateway.InsertClip(
+            sourceTrack.Id,
+            "media-1",
+            EditTime.Zero,
+            EditTime.FromSeconds(1),
+            EditTime.FromSeconds(4));
+
+        gateway.MoveClipToTrack(
+            sourceTrack.Id,
+            destinationTrack.Id,
+            original.Id,
+            EditTime.FromSeconds(6));
+
+        Assert.Empty(sourceTrack.Clips);
+        TimelineClip moved = Assert.Single(destinationTrack.Clips);
+        Assert.Equal(original.Id, moved.Id);
+        Assert.Equal(EditTime.FromSeconds(6), moved.TimelineStart);
+        Assert.Equal(EditTime.FromSeconds(3), moved.Duration);
+
+        Assert.True(gateway.Undo());
+        Assert.Single(sourceTrack.Clips);
+        Assert.Empty(destinationTrack.Clips);
+        Assert.Equal(EditTime.Zero, sourceTrack.Clips[0].TimelineStart);
+
+        Assert.True(gateway.Redo());
+        Assert.Empty(sourceTrack.Clips);
+        Assert.Single(destinationTrack.Clips);
+        Assert.Equal(EditTime.FromSeconds(6), destinationTrack.Clips[0].TimelineStart);
+    }
+
+    [Fact]
+    public void MoveClipToAnotherTrackDoesNotPartiallyMutateWhenDestinationOverlaps()
+    {
+        ProjectDocument project = ProjectDocument.Create("Cross Track Validation Test");
+        EditorCommandGateway gateway = new(project);
+        TimelineTrack sourceTrack = gateway.AddTrack("Video 1");
+        TimelineTrack destinationTrack = gateway.AddTrack("Video 2");
+        TimelineClip original = gateway.InsertClip(
+            sourceTrack.Id,
+            "media-1",
+            EditTime.Zero,
+            EditTime.Zero,
+            EditTime.FromSeconds(4));
+        _ = gateway.InsertClip(
+            destinationTrack.Id,
+            "media-2",
+            EditTime.FromSeconds(5),
+            EditTime.Zero,
+            EditTime.FromSeconds(4));
+
+        Assert.Throws<InvalidOperationException>(() => gateway.MoveClipToTrack(
+            sourceTrack.Id,
+            destinationTrack.Id,
+            original.Id,
+            EditTime.FromSeconds(6)));
+
+        TimelineClip remainingSourceClip = Assert.Single(sourceTrack.Clips);
+        Assert.Equal(original.Id, remainingSourceClip.Id);
+        Assert.Equal(EditTime.Zero, remainingSourceClip.TimelineStart);
+        Assert.Single(destinationTrack.Clips);
+        Assert.Equal(1, gateway.History.UndoCount);
+    }
+
+    [Fact]
     public void GatewayMediaOperationsAreUndoable()
     {
         ProjectDocument project = ProjectDocument.Create("Gateway Test");
