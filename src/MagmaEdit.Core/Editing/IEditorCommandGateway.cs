@@ -24,6 +24,10 @@ public interface IEditorCommandGateway
 
     void SplitClip(string trackId, string clipId, EditTime timelinePosition);
 
+    MediaAsset AddMedia(MediaAsset asset);
+
+    void RemoveMedia(string mediaId);
+
     void RenameMedia(string mediaId, string newFileName);
 
     void SetMediaPublished(string mediaId, bool isPublished);
