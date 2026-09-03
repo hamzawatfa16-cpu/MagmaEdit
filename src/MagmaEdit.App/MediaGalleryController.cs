@@ -18,6 +18,7 @@ public sealed class MediaGalleryController : IDisposable
     private readonly Action<MediaAsset> _selectMedia;
     private readonly Action _saveProject;
     private readonly Func<MediaAsset, bool> _removeMedia;
+    private readonly Func<MediaAsset, bool> _setPublished;
     private readonly Action<string> _setStatus;
     private readonly TextBox _searchBox;
     private readonly ComboBox _sortBox;
@@ -34,6 +35,7 @@ public sealed class MediaGalleryController : IDisposable
         Action<MediaAsset> selectMedia,
         Action saveProject,
         Func<MediaAsset, bool> removeMedia,
+        Func<MediaAsset, bool> setPublished,
         Action<string> setStatus)
     {
         _window = window;
@@ -42,6 +44,7 @@ public sealed class MediaGalleryController : IDisposable
         _selectMedia = selectMedia;
         _saveProject = saveProject;
         _removeMedia = removeMedia;
+        _setPublished = setPublished;
         _setStatus = setStatus;
 
         _searchBox = new TextBox
@@ -79,6 +82,7 @@ public sealed class MediaGalleryController : IDisposable
         Action<MediaAsset> selectMedia,
         Action saveProject,
         Func<MediaAsset, bool> removeMedia,
+        Func<MediaAsset, bool> setPublished,
         Action<string> setStatus)
     {
         ArgumentNullException.ThrowIfNull(window);
@@ -86,8 +90,9 @@ public sealed class MediaGalleryController : IDisposable
         ArgumentNullException.ThrowIfNull(selectMedia);
         ArgumentNullException.ThrowIfNull(saveProject);
         ArgumentNullException.ThrowIfNull(removeMedia);
+        ArgumentNullException.ThrowIfNull(setPublished);
         ArgumentNullException.ThrowIfNull(setStatus);
-        return CreateForWindow(window, getAssets, selectMedia, saveProject, removeMedia, setStatus);
+        return CreateForWindow(window, getAssets, selectMedia, saveProject, removeMedia, setPublished, setStatus);
     }
 
     public static MediaGalleryController Attach(Window window)
@@ -98,12 +103,17 @@ public sealed class MediaGalleryController : IDisposable
             throw new InvalidOperationException("The automatic gallery attachment requires MagmaEdit.MainWindow.");
         }
 
+        var publishCommands = new MediaGalleryEditorCommands(
+            mainWindow.GetProjectForExport,
+            mainWindow.SaveProjectForExport);
+
         return Attach(
             mainWindow,
             mainWindow.GetMediaAssetsForGallery,
             mainWindow.SelectMedia,
             mainWindow.SaveProjectForExport,
             mainWindow.RemoveMediaFromGallery,
+            publishCommands.SetPublished,
             mainWindow.SetStatusForGallery);
     }
 
@@ -113,6 +123,7 @@ public sealed class MediaGalleryController : IDisposable
         Action<MediaAsset> selectMedia,
         Action saveProject,
         Func<MediaAsset, bool> removeMedia,
+        Func<MediaAsset, bool> setPublished,
         Action<string> setStatus)
     {
         if (window.Content is not Grid root || root.Children.Count < 2 || root.Children[1] is not Border mediaBorder)
@@ -168,7 +179,15 @@ public sealed class MediaGalleryController : IDisposable
         mediaPanel.Children.Insert(hostIndex, scrollViewer);
         mediaPanel.Children.Insert(hostIndex, controls);
 
-        var gallery = new MediaGalleryController(window, host, getAssets, selectMedia, saveProject, removeMedia, setStatus);
+        var gallery = new MediaGalleryController(
+            window,
+            host,
+            getAssets,
+            selectMedia,
+            saveProject,
+            removeMedia,
+            setPublished,
+            setStatus);
         controls.Children.Add(gallery._searchBox);
         controls.Children.Add(gallery._sortBox);
         controls.Children.Add(gallery._statusFilterBox);
@@ -267,8 +286,11 @@ public sealed class MediaGalleryController : IDisposable
         };
         publishButton.Click += (_, _) =>
         {
-            asset.IsPublished = !asset.IsPublished;
-            _saveProject();
+            if (!_setPublished(asset, !asset.IsPublished))
+            {
+                return;
+            }
+
             Refresh();
             _setStatus($"{asset.FileName}: {(asset.IsPublished ? "Published" : "Not Published")}");
         };
