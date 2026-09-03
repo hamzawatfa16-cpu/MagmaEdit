@@ -4,6 +4,7 @@ using Avalonia.Layout;
 using Avalonia.Themes.Fluent;
 using MagmaEdit.Core.Media;
 using MagmaEdit.Media.Sprocket;
+using MagmaEdit.PluginHost;
 
 namespace MagmaEdit.App;
 
