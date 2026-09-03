@@ -57,15 +57,20 @@ if (!Uri.TryCreate(listenUrl, UriKind.Absolute, out Uri? listenUri)
 HashSet<string> allowedHosts = ParseList(
     Environment.GetEnvironmentVariable("MAGMAEDIT_MCP_HTTP_ALLOWED_HOSTS"),
     listenUri.Host,
+    listenUri.Authority,
     "localhost",
     "127.0.0.1",
+    "localhost:" + listenUri.Port,
+    "127.0.0.1:" + listenUri.Port,
+    "[::1]:" + listenUri.Port,
     "::1");
 
 HashSet<string> allowedOrigins = ParseList(
     Environment.GetEnvironmentVariable("MAGMAEDIT_MCP_HTTP_ALLOWED_ORIGINS"),
     $"{listenUri.Scheme}://{listenUri.Authority}",
-    "http://localhost:3001",
-    "http://127.0.0.1:3001");
+    $"{listenUri.Scheme}://localhost:{listenUri.Port}",
+    $"{listenUri.Scheme}://127.0.0.1:{listenUri.Port}",
+    $"{listenUri.Scheme}://[::1]:{listenUri.Port}");
 
 WebApplicationBuilder webBuilder = WebApplication.CreateBuilder(args);
 webBuilder.Services.AddSingleton(target);
@@ -85,7 +90,7 @@ app.Use(async (context, next) =>
         return;
     }
 
-    string requestHost = context.Request.Host.Value;
+    string requestHost = context.Request.Host.Value.Trim();
     if (!IsAllowedHost(requestHost, allowedHosts))
     {
         context.Response.StatusCode = StatusCodes.Status421MisdirectedRequest;
