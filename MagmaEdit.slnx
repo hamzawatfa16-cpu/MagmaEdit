@@ -13,5 +13,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/MagmaEdit.Core.Tests/MagmaEdit.Core.Tests.csproj" />
+    <Project Path="tests/MagmaEdit.PluginHost.TestPlugin/MagmaEdit.PluginHost.TestPlugin.csproj" />
   </Folder>
 </Solution>
