@@ -5,7 +5,7 @@ namespace MagmaEdit.Core.Tests;
 public sealed class PluginContractsTests
 {
     [Fact]
-    public void PluginManifest_PreservesIdentityAndCapabilities()
+    public void PluginManifestPreservesIdentityAndCapabilities()
     {
         var manifest = new PluginManifest(
             "com.magmaedit.example",
