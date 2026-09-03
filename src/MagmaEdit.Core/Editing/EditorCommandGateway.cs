@@ -48,7 +48,9 @@ public sealed class EditorCommandGateway : IEditorCommandGateway
             sourceIn,
             sourceOut);
         History.Execute(command);
-        return command.Clip;
+
+        TimelineTrack track = _timeline.GetTrack(trackId);
+        return track.Clips.First(clip => string.Equals(clip.Id, command.Clip.Id, StringComparison.Ordinal));
     }
 
     public void RemoveClip(string trackId, string clipId)
