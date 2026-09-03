@@ -11,6 +11,7 @@ namespace MagmaEdit.App;
 public sealed class App : Application
 {
     private PluginRuntime? _pluginRuntime;
+    private LiveEditorPipeServer? _liveEditorPipeServer;
 
     public override void Initialize()
     {
@@ -24,7 +25,7 @@ public sealed class App : Application
             IMediaProbeService mediaProbeService = new SprocketMediaProbeService();
             var window = new MainWindow(mediaProbeService);
             desktop.MainWindow = window;
-            desktop.Exit += async (_, _) => await DisposePluginRuntimeAsync();
+            desktop.Exit += async (_, _) => await DisposeAppServicesAsync();
 
             TryAttach("preview playback", () => _ = PreviewPlaybackController.Attach(window));
             TryAttach("media gallery", () =>
@@ -35,6 +36,7 @@ public sealed class App : Application
             TryAttach("export controller", () => _ = ExportController.Attach(window));
             TryAttach("update controller", () => _ = UpdateController.Attach(window));
             TryAttach("plugin runtime", () => StartPluginRuntime(window));
+            TryAttach("live editor IPC", () => _liveEditorPipeServer = new LiveEditorPipeServer(window));
         }
 
         base.OnFrameworkInitializationCompleted();
@@ -76,8 +78,24 @@ public sealed class App : Application
         }
     }
 
-    private async Task DisposePluginRuntimeAsync()
+    private async Task DisposeAppServicesAsync()
     {
+        if (_liveEditorPipeServer is not null)
+        {
+            try
+            {
+                await _liveEditorPipeServer.DisposeAsync();
+            }
+            catch (Exception exception)
+            {
+                StartupDiagnostics.WriteComponentFailure("live editor IPC shutdown", exception);
+            }
+            finally
+            {
+                _liveEditorPipeServer = null;
+            }
+        }
+
         if (_pluginRuntime is null)
         {
             return;
