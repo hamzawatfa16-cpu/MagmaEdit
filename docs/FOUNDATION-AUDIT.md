@@ -18,7 +18,9 @@ MagmaEdit currently contains:
 - A Sprocket-backed media probe/export boundary.
 - A shared `IEditorCommandGateway` so editor mutations can be exposed through one command path.
 - Undoable media-collection and timeline operations with regression tests.
-- A vendor-neutral `MagmaEdit.Integration` command contract and router for future AI/plugin clients.
+- A vendor-neutral `MagmaEdit.Integration` command contract, validation, capability metadata, and router for future AI/plugin clients.
+- An explicit capability-based authorization boundary for automation clients.
+- A MagmaEdit-owned, transport-neutral MCP editor tool contract; no MCP network/server implementation is claimed yet.
 - A MagmaEdit-owned plugin abstraction and collectible plugin host with manifest validation, per-plugin data directories, lifecycle handling, and regression tests.
 - Strict nullable/analyzer/format/build/test gates in CI, including Windows publishing and installer creation.
 - A pinned Sprocket submodule whose revision is verified by CI.
@@ -28,7 +30,7 @@ MagmaEdit currently contains:
 The following are planned but are not currently present as finished MagmaEdit-owned features:
 
 1. Authentication and account/session UI.
-2. A MagmaEdit-owned MCP server/tool surface.
+2. The actual MCP protocol server/transport and external connection lifecycle.
 3. A hosted AI bridge for external AI clients.
 4. Complete migration of the desktop UI away from direct project-model mutations and its private history instance.
 5. Full replacement of upstream/Sprocket implementation details behind MagmaEdit-owned interfaces.
@@ -50,7 +52,7 @@ The intended dependency direction is:
 
 `MagmaEdit.PluginHost` -> `MagmaEdit.Plugin.Abstractions`
 
-Future MCP/plugin/hosted integrations must depend on the vendor-neutral command boundary rather than introducing vendor-specific concepts into Core.
+Future MCP/plugin/hosted integrations must depend on the vendor-neutral command boundary and its authorization layer rather than introducing vendor-specific concepts into Core.
 
 ## Strict engineering rules
 
@@ -62,6 +64,8 @@ Future MCP/plugin/hosted integrations must depend on the vendor-neutral command 
 - Editing mutations should flow through the shared command gateway so UI and automation use the same history semantics.
 - Third-party notices and required licenses must remain with redistributed upstream code.
 - No large upstream source copy is allowed merely for convenience; import only code that passes the audit.
+- External automation clients must receive explicit capabilities before their commands reach the editor router.
+- The MCP contract must remain transport-neutral so a future protocol implementation can be replaced or upgraded without changing Core.
 
 ## Upstream/Sprocket boundary
 
@@ -76,8 +80,8 @@ The next implementation work should proceed in this order:
 1. Complete the command-gateway migration in the desktop application so direct timeline/media mutations are removed from UI code where an equivalent gateway operation exists.
 2. Strengthen the vendor-neutral integration boundary with explicit validation and capability metadata needed by future plugins and MCP tools.
 3. Harden the MagmaEdit-owned plugin host with failure-safe lifecycle cleanup and additional isolation tests.
-4. Define the MagmaEdit-owned MCP tool contract and authorization boundary.
-5. Build authentication/session infrastructure after the local editor command path is stable.
+4. Build the MCP protocol server/transport around the existing MagmaEdit-owned tool contract and authorization boundary.
+5. Build authentication/session infrastructure after the local editor command path and external authorization boundary are stable.
 6. Gradually replace or isolate remaining upstream implementation details while maintaining required licenses/notices.
 
 ## Rule
