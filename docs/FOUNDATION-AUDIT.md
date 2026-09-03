@@ -1,69 +1,83 @@
 # MagmaEdit Foundation Audit
 
-Date: 2026-08-31
-Status: Initial audit
+Date: 2026-09-03
+Status: Current-state audit
 
 ## Decision
 
-SprocketVideo/Sprocket is the current preferred foundation for MagmaEdit.
+SprocketVideo/Sprocket remains the current technical foundation for MagmaEdit, but MagmaEdit is being built as its own product boundary rather than as an unchanged copy.
 
-This is a foundation decision, not a promise to copy the repository unchanged. MagmaEdit will keep only code and dependencies that pass its architecture, security, licensing, quality, and product requirements.
+The repository must stay small, reviewable, and strict. We will keep upstream code only where it satisfies MagmaEdit architecture, security, licensing, quality, and product requirements.
 
-## Why Sprocket is a strong starting point
+## Current MagmaEdit state
 
-- .NET 10 solution split into Core, Media, Render, Audio, Playback, Export, Persistence, Plugins, MCP, and App projects.
-- Core is designed as a dependency-light domain layer with no native handles.
-- Editing is non-destructive and represented as project data.
-- Undo/redo is based on a command stack rather than direct model mutation.
-- Preview and export share the render graph.
-- Persistence uses versioned JSON DTOs rather than serializing native/runtime objects.
-- A plugin host already exists and is isolated from UI/media implementation details.
-- An MCP project already exists and routes AI edits through the editor session/model thread and command history.
-- The application is already a Windows desktop application and has installer/update infrastructure.
-- The repository uses warnings-as-errors in its projects and has CI/build/test workflows.
+MagmaEdit currently contains:
 
-## Things MagmaEdit must change
+- A Windows Avalonia desktop application.
+- A MagmaEdit Core domain layer for projects, timeline editing, media, and undo/redo.
+- A Sprocket-backed media probe/export boundary.
+- A shared `IEditorCommandGateway` so editor mutations can be exposed through one command path.
+- Undoable media-collection and timeline operations with regression tests.
+- A vendor-neutral `MagmaEdit.Integration` command contract and router for future AI/plugin clients.
+- Strict nullable/analyzer/format/build/test gates in CI, including Windows publishing and installer creation.
+- A pinned Sprocket submodule whose revision is verified by CI.
 
-1. Product identity: Sprocket naming, branding, UI copy, icons, assets, and package names must be replaced with MagmaEdit branding where legally and technically appropriate.
-2. Platform scope: MagmaEdit is Windows-first. Cross-platform code should not be retained merely because it exists; keep abstractions only when they reduce Windows complexity or preserve a future portability boundary.
-3. Authentication: add a clean authentication boundary. Initial implementation may use a hosted identity provider such as Supabase Auth. Authentication must not own or upload user media.
-4. User workspace: create a predictable local `Content Creation` directory for projects, media, exports, and cache.
-5. AI integration: MagmaEdit Core remains independent of any AI vendor. MCP/API contracts sit above the editing engine.
-6. ChatGPT in-product experience: build a separate hosted integration for AI clients that support MCP/App integrations. Do not expose a local editor listener directly to the public internet.
-7. Security: local MCP remains opt-in, authenticated, loopback-only, and protected against browser-originated requests. Hosted bridges must use explicit authentication and least privilege.
-8. Strict quality gates: every project gets nullable/reference safety, analyzers, formatting, deterministic tests, and CI checks. New dependencies require an explicit reason and license record.
-9. Third-party notices: retain and maintain required notices for Sprocket-derived code and every redistributed dependency. The Sprocket MIT notice must remain with substantial copies of the original code.
-10. Testing: migrate useful upstream tests first, then add MagmaEdit-specific regression tests before changing behavior.
+## Not yet implemented
 
-## Current upstream structure reviewed
+The following are planned but are not currently present as finished MagmaEdit-owned features:
 
-`Sprocket.slnx` contains separate source projects for Core, Media, Render, Audio, Playback, Export, Persistence, MCP, Plugins, and App, with matching test projects.
+1. Authentication and account/session UI.
+2. A MagmaEdit-owned MCP server/tool surface.
+3. A MagmaEdit-owned plugin host/API and plugin lifecycle model.
+4. A hosted AI bridge for external AI clients.
+5. Complete migration of the desktop UI away from direct project-model mutations and its private history instance.
+6. Full replacement of upstream/Sprocket implementation details behind MagmaEdit-owned interfaces.
+7. Final product branding, assets, packaging identity, and release polish.
 
-`Directory.Build.props` centralizes version/product metadata and configures embedded managed symbols and output cleanup.
+These items must not be described as already implemented until the corresponding code and tests exist in this repository.
 
-`Sprocket.Mcp` targets .NET 10, enables nullable reference types, treats warnings as errors, and references Core/Persistence plus the official MCP C# Core SDK.
+## Architecture direction
 
-`Sprocket.App` is a WinExe, uses Avalonia, Velopack, SkiaSharp, and references the editor layers plus MCP and Plugins.
+MagmaEdit Core stays independent of AI vendors, UI frameworks, network services, and authentication providers.
 
-The upstream CI builds on multiple operating systems and runs the test suite on Windows with FFmpeg 8 supplied by the workflow.
+The intended dependency direction is:
 
-## Licensing note
+`MagmaEdit.App` -> `MagmaEdit.Integration` / `MagmaEdit.Core`
 
-Sprocket's repository LICENSE is MIT. This permits modification and redistribution subject to retaining the copyright and license notice. This does not automatically relicense every third-party dependency; dependency licenses remain separate and must be tracked.
+`MagmaEdit.Integration` -> `MagmaEdit.Core`
 
-## Next audit stage
+`MagmaEdit.Media.Sprocket` -> `MagmaEdit.Core` + upstream Sprocket implementation
 
-Before importing source code into MagmaEdit:
+Future MCP/plugin/hosted integrations must depend on the vendor-neutral command boundary rather than introducing vendor-specific concepts into Core.
 
-- inspect all source projects and project references;
-- inventory direct and transitive dependencies;
-- inspect MCP tool surface and authorization boundaries;
-- inspect persistence/schema migration behavior;
-- inspect plugin loading and isolation;
-- inspect Windows packaging/update configuration;
-- identify upstream technical debt or known failing tests;
-- define the exact subset to import and the first MagmaEdit vertical slice.
+## Strict engineering rules
+
+- Nullable/reference safety remains enabled.
+- Warnings are errors.
+- Formatting is validated in CI.
+- Builds and tests must remain deterministic and green before the next architectural step.
+- New dependencies require an explicit reason and license review.
+- Editing mutations should flow through the shared command gateway so UI and automation use the same history semantics.
+- Third-party notices and required licenses must remain with redistributed upstream code.
+- No large upstream source copy is allowed merely for convenience; import only code that passes the audit.
+
+## Upstream/Sprocket boundary
+
+Sprocket is currently used as a foundation and submodule, not as MagmaEdit's public product identity.
+
+MagmaEdit should progressively replace direct dependence on upstream application concepts with MagmaEdit-owned contracts. This should happen in small, testable steps so each replacement can be validated by CI.
+
+## Next build stages
+
+The next implementation work should proceed in this order:
+
+1. Complete the command-gateway migration in the desktop application so direct timeline/media mutations are removed from UI code where an equivalent gateway operation exists.
+2. Strengthen the vendor-neutral integration boundary with explicit validation and capability metadata needed by future plugins and MCP tools.
+3. Define the MagmaEdit-owned plugin contract and lifecycle without loading third-party plugins into the Core process.
+4. Define the MagmaEdit-owned MCP tool contract and authorization boundary.
+5. Build authentication/session infrastructure after the local editor command path is stable.
+6. Gradually replace or isolate remaining upstream implementation details while maintaining required licenses/notices.
 
 ## Rule
 
-No large source copy happens until the next audit stage is complete. This keeps the repository small, reviewable, and recoverable if the foundation fails a requirement.
+Every architectural step must leave the repository buildable, testable, and understandable. Do not claim ownership of a subsystem until its MagmaEdit-owned boundary and implementation are actually present.
