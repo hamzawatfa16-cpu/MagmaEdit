@@ -2,11 +2,12 @@ using MagmaEdit.Integration;
 
 namespace MagmaEdit.McpServer;
 
-/// <summary>Targets the running desktop editor when available and otherwise uses the configured project file.</summary>
+/// <summary>Targets the running desktop editor for the authenticated MCP user.</summary>
 public sealed class MagmaEditAutomationTarget : IAsyncDisposable
 {
     private readonly LiveEditorPipeClient _liveClient;
     private readonly AutomationClientContext _client;
+    private readonly MagmaEditUserContext _userContext;
     private readonly string? _projectPath;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private EditorAutomationSession? _fileSession;
@@ -14,7 +15,8 @@ public sealed class MagmaEditAutomationTarget : IAsyncDisposable
 
     public MagmaEditAutomationTarget(
         string? projectPath,
-        AutomationClientContext client)
+        AutomationClientContext client,
+        MagmaEditUserContext userContext)
     {
         if (!string.IsNullOrWhiteSpace(projectPath))
         {
@@ -22,7 +24,9 @@ public sealed class MagmaEditAutomationTarget : IAsyncDisposable
         }
 
         ArgumentNullException.ThrowIfNull(client);
+        ArgumentNullException.ThrowIfNull(userContext);
         _client = client;
+        _userContext = userContext;
         _liveClient = new LiveEditorPipeClient();
     }
 
@@ -36,10 +40,12 @@ public sealed class MagmaEditAutomationTarget : IAsyncDisposable
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            string userId = GetUserId();
             LiveEditorPipeResponse? liveResponse = await TrySendLiveAsync(
                 new LiveEditorPipeRequest(
                     LiveEditorPipeProtocol.ExecuteOperation,
-                    request),
+                    request,
+                    UserId: userId),
                 cancellationToken).ConfigureAwait(false);
 
             if (liveResponse is not null)
@@ -65,8 +71,11 @@ public sealed class MagmaEditAutomationTarget : IAsyncDisposable
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            string userId = GetUserId();
             LiveEditorPipeResponse? liveResponse = await TrySendLiveAsync(
-                new LiveEditorPipeRequest(LiveEditorPipeProtocol.GetStateOperation),
+                new LiveEditorPipeRequest(
+                    LiveEditorPipeProtocol.GetStateOperation,
+                    UserId: userId),
                 cancellationToken).ConfigureAwait(false);
 
             if (liveResponse is not null)
@@ -82,6 +91,9 @@ public sealed class MagmaEditAutomationTarget : IAsyncDisposable
             _gate.Release();
         }
     }
+
+    private string GetUserId() =>
+        string.IsNullOrWhiteSpace(_userContext.UserId) ? _client.ClientId : _userContext.UserId;
 
     private async Task<LiveEditorPipeResponse?> TrySendLiveAsync(
         LiveEditorPipeRequest request,
