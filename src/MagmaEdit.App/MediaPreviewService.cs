@@ -1,3 +1,4 @@
+using MagmaEdit.Core.Media;
 using MagmaEdit.Media.Sprocket;
 
 namespace MagmaEdit.App;
