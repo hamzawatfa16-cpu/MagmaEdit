@@ -53,6 +53,22 @@ public sealed class EditorCommandGateway : IEditorCommandGateway
         return track.Clips.First(clip => string.Equals(clip.Id, command.Clip.Id, StringComparison.Ordinal));
     }
 
+    public TimelineClip DuplicateClip(string trackId, string clipId)
+    {
+        TimelineTrack track = _timeline.GetTrack(trackId);
+        TimelineClip clip = track.Clips.FirstOrDefault(candidate =>
+            string.Equals(candidate.Id, clipId, StringComparison.Ordinal))
+            ?? throw new KeyNotFoundException($"Timeline clip '{clipId}' does not exist.");
+
+        EditTime duplicateStart = track.Clips.Max(candidate => candidate.TimelineEnd);
+        return InsertClip(
+            trackId,
+            clip.MediaId,
+            duplicateStart,
+            clip.SourceIn,
+            clip.SourceOut);
+    }
+
     public void RemoveClip(string trackId, string clipId)
     {
         History.Execute(new RemoveTimelineClipCommand(_timelineEditor, trackId, clipId));
