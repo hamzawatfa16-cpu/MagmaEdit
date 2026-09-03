@@ -1,53 +1,185 @@
-using System.Reflection;
-using MagmaEdit.Core.Automation;
-using MagmaEdit.Core.Plugins;
+using MagmaEdit.Plugin.Abstractions;
 using MagmaEdit.PluginHost;
 using MagmaEdit.PluginHost.TestPlugin;
-using Xunit;
 
 namespace MagmaEdit.Core.Tests;
 
 public sealed class PluginHostTests
 {
     [Fact]
-    public async Task DiscoveryReadsManifestWithoutRunningPluginConstructor()
+    public async Task LoadsInitializesAndDisposesPluginAssembly()
     {
-        string assemblyPath = typeof(ThrowingShutdownPlugin).Assembly.Location;
-        Environment.SetEnvironmentVariable(ThrowingShutdownPlugin.ThrowOnConstructionEnvironmentVariable, "1");
+        string dataRoot = Path.Combine(Path.GetTempPath(), "MagmaEditTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dataRoot);
+
+        var commands = new TestEditorCommands();
+        var host = new MagmaEditPluginHost(dataRoot, commands);
+
         try
         {
-            PluginManifest manifest = MagmaEditPluginHost.InspectManifest(assemblyPath);
-            Assert.Equal("com.magmaedit.tests.throwing-shutdown", manifest.Id);
-            Assert.Equal("Throwing Shutdown Test Plugin", manifest.Name);
-            Assert.Contains("timeline.edit", manifest.Capabilities);
+            string assemblyPath = typeof(PluginHostTestsPlugin).Assembly.Location;
+            LoadedPlugin loaded = await host.LoadAsync(assemblyPath);
+            string pluginDataDirectory = Path.Combine(dataRoot, loaded.Manifest.Id);
+
+            Assert.Equal("com.magmaedit.tests.plugin", loaded.Manifest.Id);
+            Assert.True(Directory.Exists(pluginDataDirectory));
+            Assert.True(File.Exists(Path.Combine(pluginDataDirectory, "initialized.marker")));
+
+            await loaded.DisposeAsync();
+            Assert.True(File.Exists(Path.Combine(pluginDataDirectory, "shutdown.marker")));
         }
         finally
         {
-            Environment.SetEnvironmentVariable(ThrowingShutdownPlugin.ThrowOnConstructionEnvironmentVariable, null);
+            Directory.Delete(dataRoot, recursive: true);
         }
     }
 
     [Fact]
-    public void CatalogDiscoveryIsDeterministicAndSkipsInaccessibleEntries()
+    public async Task DeniesEditorCommandsWhenCapabilityIsMissing()
     {
-        string root = Path.Combine(Path.GetTempPath(), "MagmaEditTests", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(root);
+        var commands = new TestEditorCommands();
+        var gate = new PluginEditorCommandGate([], commands);
+
+        PluginCommandResult result = await gate.ExecuteAsync(
+            "AddTrack",
+            new Dictionary<string, string?>());
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(
+            "The plugin manifest does not declare the EditorCommands capability.",
+            result.Message);
+        Assert.Equal(0, commands.ExecutionCount);
+    }
+
+    [Fact]
+    public async Task ForwardsEditorCommandsWhenCapabilityIsDeclared()
+    {
+        var commands = new TestEditorCommands();
+        var gate = new PluginEditorCommandGate([PluginCapability.EditorCommands], commands);
+
+        PluginCommandResult result = await gate.ExecuteAsync(
+            "AddTrack",
+            new Dictionary<string, string?>());
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(1, commands.ExecutionCount);
+    }
+
+    [Fact]
+    public async Task UnloadsPluginWhenShutdownFails()
+    {
+        string dataRoot = Path.Combine(Path.GetTempPath(), "MagmaEditTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dataRoot);
+
+        var commands = new TestEditorCommands();
+        var host = new MagmaEditPluginHost(dataRoot, commands);
+
         try
         {
-            string pluginPath = typeof(PluginHostTestsPlugin).Assembly.Location;
-            string target = Path.Combine(root, "Plugin.dll");
-            File.Copy(pluginPath, target);
+            string assemblyPath = typeof(ThrowingShutdownPlugin).Assembly.Location;
+            LoadedPlugin loaded = await host.LoadAsync(assemblyPath);
 
-            PluginCatalog catalog = new(root);
-            IReadOnlyList<PluginDescriptor> first = catalog.Discover();
-            IReadOnlyList<PluginDescriptor> second = catalog.Discover();
-
-            Assert.Equal(first.Select(item => item.Manifest.Id), second.Select(item => item.Manifest.Id));
-            Assert.Single(first);
-            Assert.Equal("com.magmaedit.tests.plugin", first[0].Manifest.Id);
+            await Assert.ThrowsAsync<InvalidOperationException>(async () => await loaded.DisposeAsync());
+            await loaded.DisposeAsync();
         }
         finally
         {
+            Directory.Delete(dataRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void CatalogDiscoversValidPluginsInDeterministicOrderAndReportsProblems()
+    {
+        string pluginRoot = Path.Combine(Path.GetTempPath(), "MagmaEditTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(pluginRoot);
+
+        try
+        {
+            string validAssembly = typeof(ThrowingShutdownPlugin).Assembly.Location;
+            string firstPlugin = Path.Combine(pluginRoot, "01-first", "Plugin.dll");
+            string duplicatePlugin = Path.Combine(pluginRoot, "02-duplicate", "Plugin.dll");
+            string invalidAssembly = Path.Combine(pluginRoot, "03-invalid", "NotAPlugin.dll");
+
+            Directory.CreateDirectory(Path.GetDirectoryName(firstPlugin)!);
+            Directory.CreateDirectory(Path.GetDirectoryName(duplicatePlugin)!);
+            Directory.CreateDirectory(Path.GetDirectoryName(invalidAssembly)!);
+            File.Copy(validAssembly, firstPlugin);
+            File.Copy(validAssembly, duplicatePlugin);
+            File.Copy(typeof(MagmaEditPluginHost).Assembly.Location, invalidAssembly);
+
+            PluginDiscoveryResult result = PluginCatalog.Discover(pluginRoot);
+
+            Assert.Single(result.Plugins);
+            Assert.Equal("com.magmaedit.tests.throwing-shutdown", result.Plugins[0].Manifest.Id);
+            Assert.Equal(firstPlugin, result.Plugins[0].AssemblyPath);
+            Assert.Equal(2, result.Issues.Count);
+            Assert.Contains(result.Issues, issue => issue.AssemblyPath == duplicatePlugin);
+            Assert.Contains(result.Issues, issue => issue.AssemblyPath == invalidAssembly);
+        }
+        finally
+        {
+            Directory.Delete(pluginRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void CatalogReadsManifestWithoutRunningPluginConstructor()
+    {
+        string previous = Environment.GetEnvironmentVariable("MAGMAEDIT_TEST_FAIL_PLUGIN_CONSTRUCTOR") ?? string.Empty;
+        Environment.SetEnvironmentVariable("MAGMAEDIT_TEST_FAIL_PLUGIN_CONSTRUCTOR", "1");
+        try
+        {
+            string assemblyPath = typeof(ThrowingShutdownPlugin).Assembly.Location;
+            PluginManifest manifest = MagmaEditPluginHost.InspectManifest(assemblyPath);
+
+            Assert.Equal("com.magmaedit.tests.throwing-shutdown", manifest.Id);
+            Assert.Equal("MagmaEdit Throwing Shutdown Test Plugin", manifest.Name);
+            Assert.Equal([PluginCapability.EditorCommands], manifest.Capabilities);
+        }
+        finally
+        {
+            if (previous.Length == 0)
+            {
+                Environment.SetEnvironmentVariable("MAGMAEDIT_TEST_FAIL_PLUGIN_CONSTRUCTOR", null);
+            }
+            else
+            {
+                Environment.SetEnvironmentVariable("MAGMAEDIT_TEST_FAIL_PLUGIN_CONSTRUCTOR", previous);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ManagerLoadsAndUnloadsPluginsByStableIdentifier()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "MagmaEditTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+
+        var manager = new PluginManager(Path.Combine(root, "data"), new TestEditorCommands());
+        try
+        {
+            string assemblyPath = typeof(PluginHostTestsPlugin).Assembly.Location;
+            PluginDescriptor descriptor = new(
+                assemblyPath,
+                MagmaEditPluginHost.InspectManifest(assemblyPath));
+
+            LoadedPlugin loaded = await manager.LoadAsync(descriptor);
+
+            Assert.Equal("com.magmaedit.tests.plugin", loaded.Manifest.Id);
+            Assert.Equal(
+                ["com.magmaedit.tests.plugin"],
+                manager.LoadedPluginIds);
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                async () => await manager.LoadAsync(descriptor));
+
+            Assert.True(await manager.UnloadAsync(loaded.Manifest.Id));
+            Assert.Empty(manager.LoadedPluginIds);
+            Assert.False(await manager.UnloadAsync(loaded.Manifest.Id));
+        }
+        finally
+        {
+            await manager.DisposeAsync();
             Directory.Delete(root, recursive: true);
         }
     }
@@ -75,7 +207,7 @@ public sealed class PluginHostTests
             Assert.Single(new LoadedPlugin?[] { firstLoaded, secondLoaded }.OfType<LoadedPlugin>());
             Exception duplicateError = firstError ?? secondError!;
             Assert.IsType<InvalidOperationException>(duplicateError);
-            Assert.Equal(new[] { "com.magmaedit.tests.plugin" }, manager.LoadedPluginIds);
+            Assert.Equal(["com.magmaedit.tests.plugin"], manager.LoadedPluginIds);
 
             await manager.UnloadAsync("com.magmaedit.tests.plugin");
         }
@@ -86,31 +218,110 @@ public sealed class PluginHostTests
         }
     }
 
-    private static async Task<(T? First, T? Second, Exception? FirstError, Exception? SecondError)> ObserveLoadsAsync<T>(Task<T> first, Task<T> second)
+    private static async Task<(LoadedPlugin? First, LoadedPlugin? Second, Exception? FirstError, Exception? SecondError)> ObserveLoadsAsync(
+        Task<LoadedPlugin> first,
+        Task<LoadedPlugin> second)
     {
-        T? firstResult = null;
-        T? secondResult = null;
+        LoadedPlugin? firstLoaded = null;
+        LoadedPlugin? secondLoaded = null;
         Exception? firstError = null;
         Exception? secondError = null;
 
         try
         {
-            firstResult = await first.ConfigureAwait(false);
+            firstLoaded = await first.ConfigureAwait(false);
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            firstError = ex;
+            firstError = exception;
         }
 
         try
         {
-            secondResult = await second.ConfigureAwait(false);
+            secondLoaded = await second.ConfigureAwait(false);
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            secondError = ex;
+            secondError = exception;
         }
 
-        return (firstResult, secondResult, firstError, secondError);
+        return (firstLoaded, secondLoaded, firstError, secondError);
+    }
+
+    [Fact]
+    public async Task ManagerContinuesDisposingPluginsAfterOneShutdownFailure()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "MagmaEditTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+
+        var manager = new PluginManager(Path.Combine(root, "data"), new TestEditorCommands());
+        try
+        {
+            string assemblyPath = typeof(ThrowingShutdownPlugin).Assembly.Location;
+            PluginDescriptor descriptor = new(
+                assemblyPath,
+                MagmaEditPluginHost.InspectManifest(assemblyPath));
+
+            await manager.LoadAsync(descriptor);
+            InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(
+                async () => await manager.DisposeAsync());
+
+            Assert.Equal("Expected test shutdown failure.", exception.Message);
+            Assert.Empty(manager.LoadedPluginIds);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    private sealed class TestEditorCommands : IPluginEditorCommands
+    {
+        public int ExecutionCount { get; private set; }
+
+        public ValueTask<PluginCommandResult> ExecuteAsync(
+            string command,
+            IReadOnlyDictionary<string, string?> parameters,
+            CancellationToken cancellationToken = default)
+        {
+            ExecutionCount++;
+            return ValueTask.FromResult(PluginCommandResult.Success());
+        }
+    }
+}
+
+[MagmaEditPlugin(
+    "com.magmaedit.tests.plugin",
+    "MagmaEdit Test Plugin",
+    "1.0.0",
+    "MagmaEdit Tests",
+    PluginCapability.EditorCommands)]
+public sealed class PluginHostTestsPlugin : IMagmaEditPlugin
+{
+    private string? _pluginDataDirectory;
+
+    public PluginManifest Manifest { get; } = new(
+        "com.magmaedit.tests.plugin",
+        "MagmaEdit Test Plugin",
+        "1.0.0",
+        "MagmaEdit Tests",
+        [PluginCapability.EditorCommands]);
+
+    public ValueTask InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default)
+    {
+        _pluginDataDirectory = context.PluginDataDirectory;
+        File.WriteAllText(Path.Combine(_pluginDataDirectory, "initialized.marker"), "initialized");
+        return ValueTask.CompletedTask;
+    }
+
+    public ValueTask ShutdownAsync(CancellationToken cancellationToken = default)
+    {
+        if (_pluginDataDirectory is null)
+        {
+            throw new InvalidOperationException("Plugin was not initialized.");
+        }
+
+        File.WriteAllText(Path.Combine(_pluginDataDirectory, "shutdown.marker"), "shutdown");
+        return ValueTask.CompletedTask;
     }
 }
