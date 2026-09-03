@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/MagmaEdit.Auth/MagmaEdit.Auth.csproj" />
     <Project Path="src/MagmaEdit.Core/MagmaEdit.Core.csproj" />
     <Project Path="src/MagmaEdit.Integration/MagmaEdit.Integration.csproj" />
     <Project Path="src/MagmaEdit.Plugin.Abstractions/MagmaEdit.Plugin.Abstractions.csproj" />
