@@ -107,6 +107,10 @@ internal sealed class PluginEditorCommandAdapter : IPluginEditorCommands
                 TimelinePositionTicks: Required(Get(nameof(EditorCommandRequest.TimelinePositionTicks)), nameof(EditorCommandRequest.TimelinePositionTicks)),
                 SourceInTicks: Required(Get(nameof(EditorCommandRequest.SourceInTicks)), nameof(EditorCommandRequest.SourceInTicks)),
                 SourceOutTicks: Required(Get(nameof(EditorCommandRequest.SourceOutTicks)), nameof(EditorCommandRequest.SourceOutTicks))),
+            EditorCommandKind.DuplicateClip => new(
+                command,
+                TrackId: Required(Get(nameof(EditorCommandRequest.TrackId)), nameof(EditorCommandRequest.TrackId)),
+                ClipId: Required(Get(nameof(EditorCommandRequest.ClipId)), nameof(EditorCommandRequest.ClipId))),
             EditorCommandKind.RemoveClip => new(
                 command,
                 TrackId: Required(Get(nameof(EditorCommandRequest.TrackId)), nameof(EditorCommandRequest.TrackId)),
