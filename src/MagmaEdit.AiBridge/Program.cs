@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using MagmaEdit.AiBridge;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -23,10 +21,12 @@ app.MapPost("/v1/edit", async (
     AiBridgeOptions bridgeOptions,
     CancellationToken cancellationToken) =>
 {
-    if (!HasValidBearerToken(httpRequest, bridgeOptions.BridgeBearerToken))
+    if (!AiBridgeSecurity.HasValidBearerToken(
+        httpRequest.Headers.Authorization.ToString(),
+        bridgeOptions.BridgeBearerToken))
         return Results.Unauthorized();
 
-    if (request.AllowMutations && !bridgeOptions.AllowMutations)
+    if (!AiBridgeSecurity.IsMutationAllowed(request.AllowMutations, bridgeOptions.AllowMutations))
         return Results.StatusCode(StatusCodes.Status403Forbidden);
 
     try
@@ -53,22 +53,23 @@ app.MapPost("/v1/edit", async (
 
 app.Run();
 
-static bool HasValidBearerToken(HttpRequest request, string expectedToken)
+public static class AiBridgeSecurity
 {
-    const string prefix = "Bearer ";
+    public static bool HasValidBearerToken(string? authorization, string expectedToken)
+    {
+        const string prefix = "Bearer ";
 
-    if (!request.Headers.TryGetValue("Authorization", out var authorizationValues))
-        return false;
+        if (string.IsNullOrEmpty(authorization) || !authorization.StartsWith(prefix, StringComparison.Ordinal))
+            return false;
 
-    string authorization = authorizationValues.ToString();
-    if (!authorization.StartsWith(prefix, StringComparison.Ordinal))
-        return false;
+        string suppliedToken = authorization[prefix.Length..];
+        if (suppliedToken.Length == 0 || expectedToken.Length == 0 || suppliedToken.Length != expectedToken.Length)
+            return false;
 
-    string suppliedToken = authorization[prefix.Length..];
-    if (suppliedToken.Length == 0 || expectedToken.Length == 0)
-        return false;
+        return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+            System.Text.Encoding.UTF8.GetBytes(suppliedToken),
+            System.Text.Encoding.UTF8.GetBytes(expectedToken));
+    }
 
-    return CryptographicOperations.FixedTimeEquals(
-        Encoding.UTF8.GetBytes(suppliedToken),
-        Encoding.UTF8.GetBytes(expectedToken));
+    public static bool IsMutationAllowed(bool requested, bool serverEnabled) => !requested || serverEnabled;
 }
