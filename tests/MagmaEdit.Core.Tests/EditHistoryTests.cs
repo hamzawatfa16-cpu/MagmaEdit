@@ -101,13 +101,61 @@ public sealed class EditHistoryTests
         Assert.Null(history.RedoLabel);
     }
 
+    [Fact]
+    public void FailedUndoLeavesCommandInUndoHistory()
+    {
+        TestCommand command = new("Undo failure") { ThrowOnRevert = true };
+        EditHistory history = new();
+        history.Execute(command);
+
+        Assert.Throws<InvalidOperationException>(() => history.Undo());
+        Assert.True(command.Applied);
+        Assert.Equal(1, history.UndoCount);
+        Assert.Equal(0, history.RedoCount);
+        Assert.Equal("Undo failure", history.UndoLabel);
+    }
+
+    [Fact]
+    public void FailedRedoLeavesCommandInRedoHistory()
+    {
+        TestCommand command = new("Redo failure");
+        EditHistory history = new();
+        history.Execute(command);
+        history.Undo();
+        command.ThrowOnApply = true;
+
+        Assert.Throws<InvalidOperationException>(() => history.Redo());
+        Assert.False(command.Applied);
+        Assert.Equal(0, history.UndoCount);
+        Assert.Equal(1, history.RedoCount);
+        Assert.Equal("Redo failure", history.RedoLabel);
+    }
+
     private sealed class TestCommand(string label) : IEditCommand
     {
         public string Label { get; } = label;
         public bool Applied { get; private set; }
+        public bool ThrowOnApply { get; set; }
+        public bool ThrowOnRevert { get; set; }
 
-        public void Apply() => Applied = true;
+        public void Apply()
+        {
+            if (ThrowOnApply)
+            {
+                throw new InvalidOperationException("Apply failed.");
+            }
 
-        public void Revert() => Applied = false;
+            Applied = true;
+        }
+
+        public void Revert()
+        {
+            if (ThrowOnRevert)
+            {
+                throw new InvalidOperationException("Revert failed.");
+            }
+
+            Applied = false;
+        }
     }
 }
