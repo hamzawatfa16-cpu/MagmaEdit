@@ -36,9 +36,9 @@ public sealed class MagmaEditPluginHost
             using var assemblyStream = new MemoryStream(assemblyBytes, writable: false);
             Assembly assembly = loadContext.LoadFromStream(assemblyStream);
             Type pluginType = FindPluginType(assembly);
-            var plugin = (IMagmaEditPlugin)Activator.CreateInstance(pluginType)!;
-            ValidateManifest(plugin.Manifest);
-            return plugin.Manifest;
+            PluginManifest manifest = GetDeclaredManifest(pluginType);
+            ValidateManifest(manifest);
+            return manifest;
         }
         finally
         {
@@ -64,8 +64,12 @@ public sealed class MagmaEditPluginHost
         {
             Assembly assembly = loadContext.LoadFromAssemblyPath(fullAssemblyPath);
             Type pluginType = FindPluginType(assembly);
+            PluginManifest declaredManifest = GetDeclaredManifest(pluginType);
+            ValidateManifest(declaredManifest);
+
             var plugin = (IMagmaEditPlugin)Activator.CreateInstance(pluginType)!;
             ValidateManifest(plugin.Manifest);
+            ValidateManifestConsistency(declaredManifest, plugin.Manifest);
 
             string pluginDataDirectory = Path.Combine(_pluginDataRoot, plugin.Manifest.Id);
             Directory.CreateDirectory(pluginDataDirectory);
@@ -88,13 +92,60 @@ public sealed class MagmaEditPluginHost
     {
         Type? pluginType = assembly
             .GetExportedTypes()
-            .FirstOrDefault(type =>
+            .Where(type =>
                 typeof(IMagmaEditPlugin).IsAssignableFrom(type) &&
                 type is { IsAbstract: false, IsInterface: false } &&
-                type.GetConstructor(Type.EmptyTypes) is not null);
+                type.GetConstructor(Type.EmptyTypes) is not null)
+            .OrderBy(type => type.FullName, StringComparer.Ordinal)
+            .FirstOrDefault();
 
         return pluginType ?? throw new InvalidDataException(
             $"Assembly '{assembly.GetName().Name}' does not contain a public parameterless MagmaEdit plugin.");
+    }
+
+    private static PluginManifest GetDeclaredManifest(Type pluginType)
+    {
+        CustomAttributeData? attribute = pluginType
+            .CustomAttributes
+            .FirstOrDefault(item => item.AttributeType == typeof(MagmaEditPluginAttribute));
+
+        if (attribute is null)
+        {
+            throw new InvalidDataException(
+                $"Plugin type '{pluginType.FullName}' must declare MagmaEditPluginAttribute metadata.");
+        }
+
+        IReadOnlyList<CustomAttributeTypedArgument> arguments = attribute.ConstructorArguments;
+        if (arguments.Count != 5)
+        {
+            throw new InvalidDataException(
+                $"Plugin type '{pluginType.FullName}' has invalid MagmaEditPluginAttribute metadata.");
+        }
+
+        string id = arguments[0].Value as string
+            ?? throw new InvalidDataException("Plugin metadata is missing an identifier.");
+        string name = arguments[1].Value as string
+            ?? throw new InvalidDataException("Plugin metadata is missing a name.");
+        string version = arguments[2].Value as string
+            ?? throw new InvalidDataException("Plugin metadata is missing a version.");
+        string publisher = arguments[3].Value as string
+            ?? throw new InvalidDataException("Plugin metadata is missing a publisher.");
+
+        var capabilities = new List<PluginCapability>();
+        if (arguments[4].Value is IReadOnlyCollection<CustomAttributeTypedArgument> capabilityArguments)
+        {
+            foreach (CustomAttributeTypedArgument argument in capabilityArguments)
+            {
+                if (argument.Value is not int rawValue || !Enum.IsDefined(typeof(PluginCapability), rawValue))
+                {
+                    throw new InvalidDataException("Plugin metadata contains an invalid capability.");
+                }
+
+                capabilities.Add((PluginCapability)rawValue);
+            }
+        }
+
+        return new PluginManifest(id, name, version, publisher, capabilities);
     }
 
     private static void ValidateManifest(PluginManifest manifest)
@@ -109,6 +160,21 @@ public sealed class MagmaEditPluginHost
         if (manifest.Capabilities.Count != manifest.Capabilities.Distinct().Count())
         {
             throw new ArgumentException("Plugin capabilities must not contain duplicates.", nameof(manifest));
+        }
+    }
+
+    private static void ValidateManifestConsistency(
+        PluginManifest declaredManifest,
+        PluginManifest runtimeManifest)
+    {
+        if (!string.Equals(declaredManifest.Id, runtimeManifest.Id, StringComparison.Ordinal) ||
+            !string.Equals(declaredManifest.Name, runtimeManifest.Name, StringComparison.Ordinal) ||
+            !string.Equals(declaredManifest.Version, runtimeManifest.Version, StringComparison.Ordinal) ||
+            !string.Equals(declaredManifest.Publisher, runtimeManifest.Publisher, StringComparison.Ordinal) ||
+            !declaredManifest.Capabilities.SequenceEqual(runtimeManifest.Capabilities))
+        {
+            throw new InvalidDataException(
+                "Plugin manifest metadata does not match the runtime plugin manifest.");
         }
     }
 
