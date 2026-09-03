@@ -88,7 +88,7 @@ webBuilder.Services
     .WithTools<MagmaEditTools>();
 
 WebApplication app = webBuilder.Build();
-string expectedToken = bearerToken;
+string expectedToken = bearerToken!;
 
 app.Use(async (context, next) =>
 {
