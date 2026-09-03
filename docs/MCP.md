@@ -19,23 +19,31 @@ The current MCP server targets the `2026-07-28` MCP protocol through the officia
 
 ## Local server configuration
 
-The server requires one project path. It can be supplied as the first command-line argument:
+The server can be started with an optional project path:
 
 ```text
 MagmaEdit.McpServer.exe "C:\path\to\Project.magmaedit.json"
 ```
 
-or through:
+or:
 
 ```text
 MAGMAEDIT_PROJECT_PATH=C:\path\to\Project.magmaedit.json
 ```
 
-The server loads that project once, keeps the project and edit history alive for the process lifetime, and saves successful commands back to the same project path.
+When the MagmaEdit desktop application is running, the MCP process first connects to the live desktop session over the current-user-only Windows named pipe:
+
+```text
+MagmaEdit.LiveEditor.v1
+```
+
+Live commands mutate the same in-memory project used by the open editor, are persisted through the desktop application's save path, and then refresh the editor UI. The shared automation command authorization remains the enforcement boundary.
+
+When no desktop session is available, the MCP server falls back to the configured project path. A project path is therefore optional only when a live MagmaEdit desktop session is available.
 
 ## AI client connection model
 
-MagmaEdit's AI-facing integration is MCP over STDIO. An MCP-capable AI client starts `MagmaEdit.McpServer.exe` as a local MCP server and supplies the project path as an argument or environment variable.
+MagmaEdit's AI-facing integration is MCP over STDIO. An MCP-capable AI client starts `MagmaEdit.McpServer.exe` as a local MCP server. The server automatically targets the running MagmaEdit desktop session when its local IPC endpoint is available.
 
 The client can then call the two tools above. No simulated mouse or keyboard control is required.
 
@@ -43,10 +51,10 @@ This repository does not claim a built-in one-click connector for every AI produ
 
 ## Current authorization model
 
-The first implementation is intentionally local-process scoped. The STDIO process is started by the MCP client with an explicit local client identity and the current editor capabilities. This is not account authentication.
+The first implementation is intentionally local-process scoped. The STDIO process is started by the MCP client and the desktop IPC endpoint accepts only the current Windows user. This is not account authentication.
 
 HTTP/remote deployment must not reuse this trust model. Authentication, token/session handling, and remotely scoped authorization must be added before any network-facing MCP transport is exposed.
 
 ## Architecture rule
 
-MCP-specific transport code stays outside MagmaEdit Core. The MCP server depends on the vendor-neutral integration layer, and the integration layer depends on Core. Desktop plugins use the same vendor-neutral command contract and capability authorization boundary.
+MCP-specific transport code stays outside MagmaEdit Core. The MCP server depends on the vendor-neutral integration layer, and the integration layer depends on Core. Desktop plugins and the live desktop bridge use the same vendor-neutral command contract and capability authorization boundary.
