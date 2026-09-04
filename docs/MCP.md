@@ -43,7 +43,7 @@ Each authenticated HTTP MCP request now carries the Supabase user ID from the tr
 
 The per-user session broker and transport boundary are documented in [`SESSION-TRANSPORT.md`](SESSION-TRANSPORT.md). The current transport registry is intentionally an in-memory development implementation; production multi-user hosting still requires durable shared state and authenticated outbound desktop connectivity.
 
-When no desktop session is available, the MCP server falls back to the configured project path. A project path is therefore optional only when a live MagmaEdit desktop session is available.
+A session-bound MCP request never falls back to the configured project path when the selected desktop session is unavailable. This prevents a remote or AI request for one desktop session from silently switching to another project state. The configured project path is used as a fallback only for requests that do not carry a session ID.
 
 ## STDIO transport
 
