@@ -97,6 +97,7 @@ public sealed class App : Application, IAsyncDisposable
         TryAttach("timeline duplicate shortcut", () => TimelineClipDuplicateShortcutController.Attach(window));
         window.Show();
         previousWindow?.Close();
+        TryAttach("professional timeline", () => ProfessionalTimelineInstaller.Attach(window));
     }
 
     private static IAuthService CreateAuthService()
