@@ -19,7 +19,7 @@ public sealed class MagmaEditSessionTransportTests
 
         Assert.True(response.Succeeded);
         Assert.Equal("corr-1", response.CorrelationId);
-        Assert.Equal(1, connection.Requests.Count);
+        Assert.Single(connection.Requests);
     }
 
     [Fact]
