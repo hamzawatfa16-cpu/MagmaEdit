@@ -23,8 +23,14 @@ internal static class ProfessionalTimelineInstaller
             throw new InvalidOperationException("Could not locate the timeline host in the editor window.");
         }
 
-        timelineBorder.Child = new ProfessionalTimelineView(
+        ProfessionalTimelineView timelineView = new(
             window.GetProjectForExport,
+            window.SetStatusForGallery);
+        timelineBorder.Child = timelineView;
+        ProfessionalTimelineGestureController.Attach(
+            timelineView,
+            window.GetProjectForExport,
+            window.SaveProjectForExport,
             window.SetStatusForGallery);
     }
 
