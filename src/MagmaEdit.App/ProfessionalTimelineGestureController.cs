@@ -169,29 +169,29 @@ internal sealed class ProfessionalTimelineGestureController : IDisposable
         double deltaSeconds = deltaPixels / pixelsPerSecond;
         switch (gesture.Kind)
         {
-                case GestureKind.Move:
-                {
-                    double target = Math.Max(0, gesture.OriginalTimelineStart.ToSeconds() + deltaSeconds);
-                    target = SnapSeconds(target);
-                    _statusReporter($"Move {track.Name}: {clip.MediaId} to {target:0.00}s. Release to apply.");
-                    break;
-                }
-                case GestureKind.TrimLeft:
-                {
-                    double targetTimelineStart = Math.Max(0, gesture.OriginalTimelineStart.ToSeconds() + deltaSeconds);
-                    targetTimelineStart = SnapSeconds(targetTimelineStart);
-                    double effectiveDelta = targetTimelineStart - gesture.OriginalTimelineStart.ToSeconds();
-                    double sourceIn = Math.Max(0, gesture.OriginalSourceIn.ToSeconds() + effectiveDelta);
-                    _statusReporter($"Trim left: {sourceIn:0.00}s. Release to apply.");
-                    break;
-                }
-                case GestureKind.TrimRight:
-                {
-                    double targetSourceOut = Math.Max(0, gesture.OriginalSourceOut.ToSeconds() + deltaSeconds);
-                    targetSourceOut = SnapSeconds(targetSourceOut);
-                    _statusReporter($"Trim right: {targetSourceOut:0.00}s. Release to apply.");
-                    break;
-                }
+            case GestureKind.Move:
+            {
+                double target = Math.Max(0, gesture.OriginalTimelineStart.ToSeconds() + deltaSeconds);
+                target = SnapSeconds(target);
+                _statusReporter($"Move {track.Name}: {clip.MediaId} to {target:0.00}s. Release to apply.");
+                break;
+            }
+            case GestureKind.TrimLeft:
+            {
+                double targetTimelineStart = Math.Max(0, gesture.OriginalTimelineStart.ToSeconds() + deltaSeconds);
+                targetTimelineStart = SnapSeconds(targetTimelineStart);
+                double effectiveDelta = targetTimelineStart - gesture.OriginalTimelineStart.ToSeconds();
+                double sourceIn = Math.Max(0, gesture.OriginalSourceIn.ToSeconds() + effectiveDelta);
+                _statusReporter($"Trim left: {sourceIn:0.00}s. Release to apply.");
+                break;
+            }
+            case GestureKind.TrimRight:
+            {
+                double targetSourceOut = Math.Max(0, gesture.OriginalSourceOut.ToSeconds() + deltaSeconds);
+                targetSourceOut = SnapSeconds(targetSourceOut);
+                _statusReporter($"Trim right: {targetSourceOut:0.00}s. Release to apply.");
+                break;
+            }
         }
     }
 
