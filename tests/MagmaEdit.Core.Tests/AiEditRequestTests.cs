@@ -20,7 +20,7 @@ public sealed class AiEditRequestTests
             },
             loggerFactory.CreateLogger<OpenAiMcpEditingBridge>());
 
-        await Assert.ThrowsAsync<ArgumentException>(() => bridge.EditAsync(
+        await Assert.ThrowsAsync<ArgumentNullException>(() => bridge.EditAsync(
             new AiEditRequest("Add a track", AllowMutations: true),
             "user-123",
             CancellationToken.None));
