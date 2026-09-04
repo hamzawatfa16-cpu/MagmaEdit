@@ -1,0 +1,1 @@
+PR #6 implements the vendor-neutral durable-session transport contract and development router. Production distributed infrastructure remains explicitly outside this stage.
