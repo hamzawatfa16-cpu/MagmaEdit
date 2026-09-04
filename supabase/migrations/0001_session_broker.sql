@@ -15,6 +15,8 @@ create table if not exists magmaedit.desktop_sessions (
     constraint desktop_sessions_endpoint_not_blank check (length(btrim(endpoint)) > 0)
 );
 
+alter table magmaedit.desktop_sessions enable row level security;
+
 create index if not exists desktop_sessions_expires_at_idx
     on magmaedit.desktop_sessions (expires_at);
 
