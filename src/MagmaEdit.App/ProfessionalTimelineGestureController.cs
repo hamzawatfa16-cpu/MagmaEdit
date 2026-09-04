@@ -167,31 +167,25 @@ internal sealed class ProfessionalTimelineGestureController : IDisposable
 
         double pixelsPerSecond = GetPixelsPerSecond();
         double deltaSeconds = deltaPixels / pixelsPerSecond;
-        switch (gesture.Kind)
+        if (gesture.Kind == GestureKind.Move)
         {
-            case GestureKind.Move:
-            {
-                double target = Math.Max(0, gesture.OriginalTimelineStart.ToSeconds() + deltaSeconds);
-                target = SnapSeconds(target);
-                _statusReporter($"Move {track.Name}: {clip.MediaId} to {target:0.00}s. Release to apply.");
-                break;
-            }
-            case GestureKind.TrimLeft:
-            {
-                double targetTimelineStart = Math.Max(0, gesture.OriginalTimelineStart.ToSeconds() + deltaSeconds);
-                targetTimelineStart = SnapSeconds(targetTimelineStart);
-                double effectiveDelta = targetTimelineStart - gesture.OriginalTimelineStart.ToSeconds();
-                double sourceIn = Math.Max(0, gesture.OriginalSourceIn.ToSeconds() + effectiveDelta);
-                _statusReporter($"Trim left: {sourceIn:0.00}s. Release to apply.");
-                break;
-            }
-            case GestureKind.TrimRight:
-            {
-                double targetSourceOut = Math.Max(0, gesture.OriginalSourceOut.ToSeconds() + deltaSeconds);
-                targetSourceOut = SnapSeconds(targetSourceOut);
-                _statusReporter($"Trim right: {targetSourceOut:0.00}s. Release to apply.");
-                break;
-            }
+            double target = Math.Max(0, gesture.OriginalTimelineStart.ToSeconds() + deltaSeconds);
+            target = SnapSeconds(target);
+            _statusReporter($"Move {track.Name}: {clip.MediaId} to {target:0.00}s. Release to apply.");
+        }
+        else if (gesture.Kind == GestureKind.TrimLeft)
+        {
+            double targetTimelineStart = Math.Max(0, gesture.OriginalTimelineStart.ToSeconds() + deltaSeconds);
+            targetTimelineStart = SnapSeconds(targetTimelineStart);
+            double effectiveDelta = targetTimelineStart - gesture.OriginalTimelineStart.ToSeconds();
+            double sourceIn = Math.Max(0, gesture.OriginalSourceIn.ToSeconds() + effectiveDelta);
+            _statusReporter($"Trim left: {sourceIn:0.00}s. Release to apply.");
+        }
+        else if (gesture.Kind == GestureKind.TrimRight)
+        {
+            double targetSourceOut = Math.Max(0, gesture.OriginalSourceOut.ToSeconds() + deltaSeconds);
+            targetSourceOut = SnapSeconds(targetSourceOut);
+            _statusReporter($"Trim right: {targetSourceOut:0.00}s. Release to apply.");
         }
     }
 
@@ -231,42 +225,36 @@ internal sealed class ProfessionalTimelineGestureController : IDisposable
         try
         {
             EditorCommandGateway gateway = new(project);
-            switch (gesture.Kind)
+            if (gesture.Kind == GestureKind.Move)
             {
-                case GestureKind.Move:
-                {
-                    double targetSeconds = Math.Max(0, gesture.OriginalTimelineStart.ToSeconds() + deltaSeconds);
-                    targetSeconds = SnapSeconds(targetSeconds);
-                    gateway.MoveClip(track.Id, clip.Id, EditTime.FromSeconds(targetSeconds));
-                    _statusReporter($"Moved clip on {track.Name} to {targetSeconds:0.00}s.");
-                    break;
-                }
-                case GestureKind.TrimLeft:
-                {
-                    double targetTimelineStart = Math.Max(0, gesture.OriginalTimelineStart.ToSeconds() + deltaSeconds);
-                    targetTimelineStart = SnapSeconds(targetTimelineStart);
-                    double effectiveDelta = targetTimelineStart - gesture.OriginalTimelineStart.ToSeconds();
-                    double sourceIn = Math.Max(0, gesture.OriginalSourceIn.ToSeconds() + effectiveDelta);
-                    gateway.TrimClip(
-                        track.Id,
-                        clip.Id,
-                        EditTime.FromSeconds(sourceIn),
-                        gesture.OriginalSourceOut);
-                    _statusReporter($"Trimmed left edge of clip on {track.Name}.");
-                    break;
-                }
-                case GestureKind.TrimRight:
-                {
-                    double targetSourceOut = Math.Max(0, gesture.OriginalSourceOut.ToSeconds() + deltaSeconds);
-                    targetSourceOut = SnapSeconds(targetSourceOut);
-                    gateway.TrimClip(
-                        track.Id,
-                        clip.Id,
-                        gesture.OriginalSourceIn,
-                        EditTime.FromSeconds(targetSourceOut));
-                    _statusReporter($"Trimmed right edge of clip on {track.Name}.");
-                    break;
-                }
+                double targetSeconds = Math.Max(0, gesture.OriginalTimelineStart.ToSeconds() + deltaSeconds);
+                targetSeconds = SnapSeconds(targetSeconds);
+                gateway.MoveClip(track.Id, clip.Id, EditTime.FromSeconds(targetSeconds));
+                _statusReporter($"Moved clip on {track.Name} to {targetSeconds:0.00}s.");
+            }
+            else if (gesture.Kind == GestureKind.TrimLeft)
+            {
+                double targetTimelineStart = Math.Max(0, gesture.OriginalTimelineStart.ToSeconds() + deltaSeconds);
+                targetTimelineStart = SnapSeconds(targetTimelineStart);
+                double effectiveDelta = targetTimelineStart - gesture.OriginalTimelineStart.ToSeconds();
+                double sourceIn = Math.Max(0, gesture.OriginalSourceIn.ToSeconds() + effectiveDelta);
+                gateway.TrimClip(
+                    track.Id,
+                    clip.Id,
+                    EditTime.FromSeconds(sourceIn),
+                    gesture.OriginalSourceOut);
+                _statusReporter($"Trimmed left edge of clip on {track.Name}.");
+            }
+            else if (gesture.Kind == GestureKind.TrimRight)
+            {
+                double targetSourceOut = Math.Max(0, gesture.OriginalSourceOut.ToSeconds() + deltaSeconds);
+                targetSourceOut = SnapSeconds(targetSourceOut);
+                gateway.TrimClip(
+                    track.Id,
+                    clip.Id,
+                    gesture.OriginalSourceIn,
+                    EditTime.FromSeconds(targetSourceOut));
+                _statusReporter($"Trimmed right edge of clip on {track.Name}.");
             }
 
             _saveProject();
