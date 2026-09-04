@@ -95,6 +95,7 @@ public sealed class App : Application, IAsyncDisposable
             _liveEditorPipeServer = new LiveEditorPipeServer(window, userId);
         });
         TryAttach("timeline duplicate shortcut", () => TimelineClipDuplicateShortcutController.Attach(window));
+        TryAttach("professional timeline", () => ProfessionalTimelineInstaller.Attach(window));
         window.Show();
         previousWindow?.Close();
     }
