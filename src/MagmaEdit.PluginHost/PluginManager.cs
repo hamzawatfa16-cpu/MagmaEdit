@@ -37,11 +37,21 @@ public sealed class PluginManager : IAsyncDisposable
                     $"Plugin '{descriptor.Manifest.Id}' is already loaded.");
             }
 
+            string currentAssemblySha256 = PluginIntegrity.ComputeSha256(descriptor.AssemblyPath);
+            if (!string.Equals(
+                    currentAssemblySha256,
+                    descriptor.AssemblySha256,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException(
+                    $"Plugin assembly changed after discovery for '{descriptor.Manifest.Id}'.");
+            }
+
             LoadedPlugin loaded = await _host.LoadAsync(
                 descriptor.AssemblyPath,
                 cancellationToken).ConfigureAwait(false);
 
-            if (!string.Equals(loaded.Manifest.Id, descriptor.Manifest.Id, StringComparison.Ordinal))
+            if (!ManifestMatches(descriptor.Manifest, loaded.Manifest))
             {
                 await loaded.DisposeAsync().ConfigureAwait(false);
                 throw new InvalidDataException(
@@ -126,4 +136,11 @@ public sealed class PluginManager : IAsyncDisposable
             _lifecycleGate.Dispose();
         }
     }
+
+    private static bool ManifestMatches(PluginManifest expected, PluginManifest actual) =>
+        string.Equals(expected.Id, actual.Id, StringComparison.Ordinal) &&
+        string.Equals(expected.Name, actual.Name, StringComparison.Ordinal) &&
+        string.Equals(expected.Version, actual.Version, StringComparison.Ordinal) &&
+        string.Equals(expected.Publisher, actual.Publisher, StringComparison.Ordinal) &&
+        expected.Capabilities.SequenceEqual(actual.Capabilities);
 }
