@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using MagmaEdit.Core.Editing;
 using MagmaEdit.Core.Projects;
@@ -93,7 +94,7 @@ internal sealed class ProfessionalTimelineGestureController : IDisposable
         _gesture = null;
     }
 
-    private void View_Unloaded(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Dispose();
+    private void View_Unloaded(object? sender, RoutedEventArgs e) => Dispose();
 
     private void View_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
@@ -269,23 +270,23 @@ internal sealed class ProfessionalTimelineGestureController : IDisposable
             }
 
             _saveProject();
-            RefreshView();
+            RequestRefresh();
             e.Handled = true;
         }
         catch (ArgumentOutOfRangeException exception)
         {
             _statusReporter($"Timeline edit rejected: {exception.Message}");
-            RefreshView();
+            RequestRefresh();
         }
         catch (InvalidOperationException exception)
         {
             _statusReporter($"Timeline edit rejected: {exception.Message}");
-            RefreshView();
+            RequestRefresh();
         }
         catch (KeyNotFoundException exception)
         {
             _statusReporter($"Timeline edit rejected: {exception.Message}");
-            RefreshView();
+            RequestRefresh();
         }
     }
 
@@ -308,7 +309,7 @@ internal sealed class ProfessionalTimelineGestureController : IDisposable
             gateway.SplitClip(hit.Track.Id, hit.Clip.Id, EditTime.FromSeconds(seconds));
             _saveProject();
             _statusReporter($"Split clip at {seconds:0.00}s.");
-            RefreshView();
+            RequestRefresh();
         }
         catch (ArgumentOutOfRangeException exception)
         {
@@ -375,10 +376,11 @@ internal sealed class ProfessionalTimelineGestureController : IDisposable
         }
 
         TimelineTrack track = project.Timeline.Tracks[trackIndex];
+        double pixelsPerSecond = GetPixelsPerSecond();
         TimelineClip? clip = track.Clips.FirstOrDefault(candidate =>
         {
-            double left = TrackLabelWidth + candidate.TimelineStart.ToSeconds() * GetPixelsPerSecond();
-            double width = Math.Max(36, candidate.Duration.ToSeconds() * GetPixelsPerSecond());
+            double left = TrackLabelWidth + candidate.TimelineStart.ToSeconds() * pixelsPerSecond;
+            double width = Math.Max(36, candidate.Duration.ToSeconds() * pixelsPerSecond);
             return Math.Abs(left - buttonLeft) < 2 && point.X >= left && point.X <= left + width;
         });
         if (clip is null)
@@ -386,8 +388,8 @@ internal sealed class ProfessionalTimelineGestureController : IDisposable
             return null;
         }
 
-        double clipLeft = TrackLabelWidth + clip.TimelineStart.ToSeconds() * GetPixelsPerSecond();
-        double clipWidth = Math.Max(36, clip.Duration.ToSeconds() * GetPixelsPerSecond());
+        double clipLeft = TrackLabelWidth + clip.TimelineStart.ToSeconds() * pixelsPerSecond;
+        double clipWidth = Math.Max(36, clip.Duration.ToSeconds() * pixelsPerSecond);
         return new TimelineHit(track, clip, clipLeft, clipWidth, point);
     }
 
@@ -416,15 +418,10 @@ internal sealed class ProfessionalTimelineGestureController : IDisposable
         return slider is { Value: > 0 } ? slider.Value : 80;
     }
 
-    private double SnapSeconds(double seconds)
-    {
-        if (!IsSnapEnabled())
-        {
-            return seconds;
-        }
-
-        return Math.Round(seconds, MidpointRounding.AwayFromZero);
-    }
+    private double SnapSeconds(double seconds) =>
+        IsSnapEnabled()
+            ? Math.Round(seconds, MidpointRounding.AwayFromZero)
+            : seconds;
 
     private bool IsSnapEnabled() =>
         _view.GetVisualDescendants()
@@ -432,9 +429,5 @@ internal sealed class ProfessionalTimelineGestureController : IDisposable
             .FirstOrDefault(checkBox => string.Equals(checkBox.Content?.ToString(), "Snap 1s", StringComparison.Ordinal))
             ?.IsChecked == true;
 
-    private void RefreshView()
-    {
-        _view.InvalidateVisual();
-        _view.GetVisualDescendants().OfType<Canvas>().FirstOrDefault();
-    }
+    private void RequestRefresh() => _view.InvalidateVisual();
 }
