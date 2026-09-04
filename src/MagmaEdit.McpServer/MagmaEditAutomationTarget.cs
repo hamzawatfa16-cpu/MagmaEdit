@@ -2,7 +2,7 @@ using MagmaEdit.Integration;
 
 namespace MagmaEdit.McpServer;
 
-/// <summary>Targets the running desktop editor for the authenticated MCP user.</summary>
+/// <summary>Targets the running desktop editor for the authenticated MagmaEdit user and session.</summary>
 public sealed class MagmaEditAutomationTarget : IAsyncDisposable
 {
     private readonly LiveEditorPipeClient _liveClient;
@@ -40,12 +40,13 @@ public sealed class MagmaEditAutomationTarget : IAsyncDisposable
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            string userId = GetUserId();
+            (string userId, string? sessionId) = GetIdentity();
             LiveEditorPipeResponse? liveResponse = await TrySendLiveAsync(
                 new LiveEditorPipeRequest(
                     LiveEditorPipeProtocol.ExecuteOperation,
                     request,
-                    UserId: userId),
+                    UserId: userId,
+                    SessionId: sessionId),
                 cancellationToken).ConfigureAwait(false);
 
             if (liveResponse is not null)
@@ -71,11 +72,12 @@ public sealed class MagmaEditAutomationTarget : IAsyncDisposable
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            string userId = GetUserId();
+            (string userId, string? sessionId) = GetIdentity();
             LiveEditorPipeResponse? liveResponse = await TrySendLiveAsync(
                 new LiveEditorPipeRequest(
                     LiveEditorPipeProtocol.GetStateOperation,
-                    UserId: userId),
+                    UserId: userId,
+                    SessionId: sessionId),
                 cancellationToken).ConfigureAwait(false);
 
             if (liveResponse is not null)
@@ -92,8 +94,11 @@ public sealed class MagmaEditAutomationTarget : IAsyncDisposable
         }
     }
 
-    private string GetUserId() =>
-        string.IsNullOrWhiteSpace(_userContext.UserId) ? _client.ClientId : _userContext.UserId;
+    private (string UserId, string? SessionId) GetIdentity()
+    {
+        string userId = string.IsNullOrWhiteSpace(_userContext.UserId) ? _client.ClientId : _userContext.UserId;
+        return (userId, _userContext.SessionId);
+    }
 
     private async Task<LiveEditorPipeResponse?> TrySendLiveAsync(
         LiveEditorPipeRequest request,
