@@ -1,1 +1,0 @@
-PR #6 is ready for review after implementation and regression coverage.
