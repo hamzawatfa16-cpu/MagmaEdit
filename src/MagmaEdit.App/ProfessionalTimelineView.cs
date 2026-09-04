@@ -1,11 +1,13 @@
 using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
 using MagmaEdit.Core.Editing;
+using MagmaEdit.Core.Media;
 using MagmaEdit.Core.Projects;
 
 namespace MagmaEdit.App;
