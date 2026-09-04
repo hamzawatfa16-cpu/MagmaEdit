@@ -8,6 +8,7 @@ public sealed record LiveEditorPipeRequest(
     string Operation,
     EditorCommandRequest? Command = null,
     string? UserId = null,
+    string? SessionId = null,
     string ProtocolVersion = LiveEditorPipeProtocol.Version);
 
 /// <summary>Stable JSON response returned by the live desktop editor.</summary>

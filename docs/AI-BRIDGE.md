@@ -42,9 +42,12 @@ Example request:
 {
   "prompt": "Add a video track and tell me what changed",
   "previousResponseId": null,
-  "allowMutations": false
+  "allowMutations": true,
+  "sessionId": "desktop-session-123"
 }
 ```
+
+When `allowMutations` is true, `sessionId` is required. The bridge forwards the authenticated user ID and selected desktop session ID to the remote MCP server as trusted request headers.
 
 ## Account authorization
 
@@ -54,9 +57,9 @@ Example request:
 
 Read-only requests expose only `magmaedit.get_editor_state`.
 
-Mutation-enabled requests expose `magmaedit.get_editor_state` and `magmaedit.execute_editor_command`, but only when the server enables mutations, exactly one user ID is configured in the allowlist, and the authenticated user is that user.
+Mutation-enabled requests expose `magmaedit.get_editor_state` and `magmaedit.execute_editor_command`, but only when the server enables mutations, exactly one user ID is configured in the allowlist, the authenticated user is that user, and a desktop session ID is supplied.
 
-The single-user condition prevents multiple accounts from sharing one mutable remote MCP/editor session. Per-user editor-session and MCP-credential isolation is a later stage.
+The selected session ID is propagated through MCP into the live-editor transport envelope. A desktop deployment may additionally set `MAGMAEDIT_DESKTOP_SESSION_ID` so the local named-pipe endpoint rejects requests for a different session.
 
 The authoritative validation and capability authorization still happen inside the MagmaEdit integration/router layer.
 
@@ -85,4 +88,4 @@ Secrets must come from the hosting platform's secret store and must never be com
 
 ## Public deployment boundary
 
-The current service is intentionally not a complete multi-user production system. Before public multi-user deployment, it still needs per-user MCP/editor-session binding, distributed rate limiting, durable audit storage, secret rotation, TLS termination, monitoring, and production authentication/authorization policy.
+The current service now carries explicit user and desktop-session identity through the AI → MCP → desktop request path. It still does not claim a production distributed broker. Before public multi-user deployment, the session mapping itself must be backed by durable shared state and authenticated outbound desktop connectivity, alongside distributed rate limiting, durable audit storage, secret rotation, TLS termination, monitoring, and production authentication/authorization policy.

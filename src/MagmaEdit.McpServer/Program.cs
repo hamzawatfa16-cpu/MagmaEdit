@@ -48,15 +48,13 @@ if (string.IsNullOrWhiteSpace(bearerToken))
 
 string listenUrl = Environment.GetEnvironmentVariable("MAGMAEDIT_MCP_HTTP_URL")?.Trim()
     ?? "http://127.0.0.1:3001";
-if (!Uri.TryCreate(listenUrl, UriKind.Absolute, out Uri? parsedListenUri)
-    || parsedListenUri is null)
+if (!Uri.TryCreate(listenUrl, UriKind.Absolute, out Uri? parsedListenUri) || parsedListenUri is null)
 {
     throw new InvalidOperationException(
         $"MAGMAEDIT_MCP_HTTP_URL must be an absolute HTTP or HTTPS URL. Received '{listenUrl}'.");
 }
 
-if ((parsedListenUri.Scheme is not "http" and not "https")
-    || string.IsNullOrWhiteSpace(parsedListenUri.Host))
+if ((parsedListenUri.Scheme is not "http" and not "https") || string.IsNullOrWhiteSpace(parsedListenUri.Host))
 {
     throw new InvalidOperationException(
         $"MAGMAEDIT_MCP_HTTP_URL must be an absolute HTTP or HTTPS URL. Received '{listenUrl}'.");
@@ -109,8 +107,7 @@ app.Use(async (context, next) =>
     }
 
     string origin = context.Request.Headers.Origin.ToString().Trim();
-    if (!string.IsNullOrWhiteSpace(origin)
-        && !IsAllowedOrigin(origin, allowedOrigins))
+    if (!string.IsNullOrWhiteSpace(origin) && !IsAllowedOrigin(origin, allowedOrigins))
     {
         context.Response.StatusCode = StatusCodes.Status403Forbidden;
         return;
@@ -144,7 +141,9 @@ app.Use(async (context, next) =>
         return;
     }
 
+    string sessionId = context.Request.Headers["X-MagmaEdit-Session-Id"].ToString().Trim();
     userContext.UserId = userId;
+    userContext.SessionId = string.IsNullOrWhiteSpace(sessionId) ? null : sessionId;
     try
     {
         await next().ConfigureAwait(false);
@@ -152,6 +151,7 @@ app.Use(async (context, next) =>
     finally
     {
         userContext.UserId = null;
+        userContext.SessionId = null;
     }
 });
 
@@ -163,7 +163,6 @@ static HashSet<string> ParseList(string? value, params string[] defaults)
     IEnumerable<string> entries = string.IsNullOrWhiteSpace(value)
         ? defaults
         : value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
     return new HashSet<string>(entries, StringComparer.OrdinalIgnoreCase);
 }
 
@@ -171,20 +170,14 @@ static bool IsAllowedHost(string requestHost, IReadOnlySet<string> allowedHosts)
 {
     string normalizedHost = requestHost.Trim().TrimEnd('.');
     if (allowedHosts.Contains(normalizedHost))
-    {
         return true;
-    }
-
     return allowedHosts.Contains(requestHost.Trim());
 }
 
 static bool IsAllowedOrigin(string origin, IReadOnlySet<string> allowedOrigins)
 {
     if (!Uri.TryCreate(origin, UriKind.Absolute, out Uri? originUri))
-    {
         return false;
-    }
-
     string normalized = originUri.GetLeftPart(UriPartial.Authority).TrimEnd('/');
     return allowedOrigins.Contains(normalized);
 }
