@@ -56,6 +56,7 @@ public sealed class MagmaEditAutomationTarget : IAsyncDisposable
                     "The live MagmaEdit editor returned no command result.");
             }
 
+            EnsureFileFallbackAllowed(sessionId);
             return GetFileSession().Execute(request);
         }
         finally
@@ -86,6 +87,7 @@ public sealed class MagmaEditAutomationTarget : IAsyncDisposable
                     "The live MagmaEdit editor returned no project state.");
             }
 
+            EnsureFileFallbackAllowed(sessionId);
             return GetFileSession().GetState();
         }
         finally
@@ -98,6 +100,15 @@ public sealed class MagmaEditAutomationTarget : IAsyncDisposable
     {
         string userId = string.IsNullOrWhiteSpace(_userContext.UserId) ? _client.ClientId : _userContext.UserId;
         return (userId, _userContext.SessionId);
+    }
+
+    private static void EnsureFileFallbackAllowed(string? sessionId)
+    {
+        if (!string.IsNullOrWhiteSpace(sessionId))
+        {
+            throw new InvalidOperationException(
+                "The selected MagmaEdit desktop session is unavailable. Refusing to fall back to a different project state.");
+        }
     }
 
     private async Task<LiveEditorPipeResponse?> TrySendLiveAsync(
