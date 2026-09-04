@@ -11,6 +11,8 @@ The host provides:
 - deterministic recursive DLL discovery through `PluginCatalog`
 - manifest inspection without constructing the plugin
 - manifest validation before a plugin is loaded
+- SHA-256 assembly integrity recorded at discovery and rechecked before load
+- full manifest consistency verification between discovery and runtime load
 - duplicate plugin-ID detection
 - collectible `AssemblyLoadContext` isolation
 - per-plugin writable data directories
@@ -25,6 +27,10 @@ The host provides:
 Discovery is not execution. MagmaEdit discovers DLLs and reads declarative manifest metadata, but it does not construct or initialize the plugin during discovery. The desktop application opens the plugin manager when plugins are discovered so the user can review each plugin's name, publisher, version, identifier, and requested capabilities before choosing **Approve & Load**.
 
 A discovered plugin remains inert until the user explicitly loads it. Loaded plugins can later be unloaded from the same manager.
+
+Before loading, the manager recomputes the plugin assembly SHA-256 and rejects the load when the file differs from what was discovered. It also compares the complete discovered manifest against the runtime manifest, including identifier, name, version, publisher, and capabilities.
+
+These integrity checks protect the discovery-to-load boundary; they do not make an arbitrary third-party DLL sandboxed. A loaded .NET plugin runs in the desktop process and must therefore be treated as trusted code.
 
 Plugins only receive the interfaces declared in `MagmaEdit.Plugin.Abstractions`. They do not receive direct access to the mutable Core project model.
 
