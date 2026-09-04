@@ -12,6 +12,7 @@ internal sealed class LiveEditorPipeServer : IAsyncDisposable
     private readonly CancellationTokenSource _shutdown = new();
     private readonly Task _runTask;
     private readonly string _expectedUserId;
+    private readonly string? _expectedSessionId;
     private bool _disposed;
 
     public LiveEditorPipeServer(MainWindow window, string expectedUserId)
@@ -21,6 +22,7 @@ internal sealed class LiveEditorPipeServer : IAsyncDisposable
 
         _window = window;
         _expectedUserId = expectedUserId.Trim();
+        _expectedSessionId = Normalize(Environment.GetEnvironmentVariable("MAGMAEDIT_DESKTOP_SESSION_ID"));
         _runTask = RunAsync();
     }
 
@@ -55,58 +57,36 @@ internal sealed class LiveEditorPipeServer : IAsyncDisposable
         }
     }
 
-    private async Task HandleConnectionAsync(
-        NamedPipeServerStream server,
-        CancellationToken cancellationToken)
+    private async Task HandleConnectionAsync(NamedPipeServerStream server, CancellationToken cancellationToken)
     {
         using var reader = new StreamReader(server, leaveOpen: true);
-        await using var writer = new StreamWriter(server, leaveOpen: true)
-        {
-            AutoFlush = true
-        };
+        await using var writer = new StreamWriter(server, leaveOpen: true) { AutoFlush = true };
 
         string? requestJson = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
-        LiveEditorPipeResponse response;
-
-        if (string.IsNullOrWhiteSpace(requestJson))
-        {
-            response = Failure("The live editor pipe received an empty request.");
-        }
-        else
-        {
-            response = await ProcessRequestAsync(requestJson, cancellationToken).ConfigureAwait(false);
-        }
+        LiveEditorPipeResponse response = string.IsNullOrWhiteSpace(requestJson)
+            ? Failure("The live editor pipe received an empty request.")
+            : await ProcessRequestAsync(requestJson, cancellationToken).ConfigureAwait(false);
 
         string json = JsonSerializer.Serialize(response, LiveEditorPipeProtocol.JsonOptions);
         await writer.WriteLineAsync(json).ConfigureAwait(false);
     }
 
-    private async Task<LiveEditorPipeResponse> ProcessRequestAsync(
-        string requestJson,
-        CancellationToken cancellationToken)
+    private async Task<LiveEditorPipeResponse> ProcessRequestAsync(string requestJson, CancellationToken cancellationToken)
     {
         try
         {
-            LiveEditorPipeRequest? request = JsonSerializer.Deserialize<LiveEditorPipeRequest>(
-                requestJson,
-                LiveEditorPipeProtocol.JsonOptions);
+            LiveEditorPipeRequest? request = JsonSerializer.Deserialize<LiveEditorPipeRequest>(requestJson, LiveEditorPipeProtocol.JsonOptions);
             if (request is null)
-            {
                 return Failure("The live editor pipe request was invalid.");
-            }
 
-            if (!string.Equals(
-                    request.ProtocolVersion,
-                    LiveEditorPipeProtocol.Version,
-                    StringComparison.Ordinal))
-            {
+            if (!string.Equals(request.ProtocolVersion, LiveEditorPipeProtocol.Version, StringComparison.Ordinal))
                 return Failure($"Unsupported live editor pipe protocol version '{request.ProtocolVersion}'.");
-            }
 
             if (!IsUserAuthorized(request.UserId))
-            {
                 return Failure("The live editor session is not authorized for this user.");
-            }
+
+            if (!IsSessionAuthorized(request.SessionId))
+                return Failure("The live editor session identity does not match the desktop session.");
 
             return request.Operation switch
             {
@@ -141,14 +121,16 @@ internal sealed class LiveEditorPipeServer : IAsyncDisposable
         !string.IsNullOrWhiteSpace(requestedUserId)
         && string.Equals(_expectedUserId, requestedUserId.Trim(), StringComparison.Ordinal);
 
-    private Task<LiveEditorPipeResponse> ExecuteOnUiThreadAsync(
-        LiveEditorPipeRequest request,
-        CancellationToken cancellationToken)
+    private bool IsSessionAuthorized(string? requestedSessionId) =>
+        _expectedSessionId is null || string.Equals(_expectedSessionId, requestedSessionId?.Trim(), StringComparison.Ordinal);
+
+    private static string? Normalize(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private Task<LiveEditorPipeResponse> ExecuteOnUiThreadAsync(LiveEditorPipeRequest request, CancellationToken cancellationToken)
     {
         if (request.Command is null)
-        {
             return Task.FromResult(Failure("An editor command is required."));
-        }
 
         return InvokeOnUiThreadAsync(() =>
         {
@@ -160,16 +142,9 @@ internal sealed class LiveEditorPipeServer : IAsyncDisposable
             EditorCommandResult result = session.Execute(request.Command);
 
             if (result.Succeeded)
-            {
-                LiveEditorPipeUiRefresh.Refresh(
-                    _window,
-                    $"Project updated by AI: {result.Message}");
-            }
+                LiveEditorPipeUiRefresh.Refresh(_window, $"Project updated by AI: {result.Message}");
 
-            return new LiveEditorPipeResponse(
-                result.Succeeded,
-                result.Message,
-                CommandResult: result);
+            return new LiveEditorPipeResponse(result.Succeeded, result.Message, CommandResult: result);
         }, cancellationToken);
     }
 
@@ -181,10 +156,7 @@ internal sealed class LiveEditorPipeServer : IAsyncDisposable
                 CreateClient(),
                 _window.SaveProjectForExport);
             EditorProjectState state = session.GetState();
-            return new LiveEditorPipeResponse(
-                true,
-                "Live editor state retrieved.",
-                State: state);
+            return new LiveEditorPipeResponse(true, "Live editor state retrieved.", State: state);
         }, cancellationToken);
 
     private static AutomationClientContext CreateClient() => new(
@@ -197,23 +169,18 @@ internal sealed class LiveEditorPipeServer : IAsyncDisposable
             EditorCommandCapability.History
         });
 
-    private static Task<T> InvokeOnUiThreadAsync<T>(
-        Func<T> callback,
-        CancellationToken cancellationToken)
+    private static Task<T> InvokeOnUiThreadAsync<T>(Func<T> callback, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return Dispatcher.UIThread.InvokeAsync(callback).GetTask();
     }
 
-    private static LiveEditorPipeResponse Failure(string message) =>
-        new(false, message);
+    private static LiveEditorPipeResponse Failure(string message) => new(false, message);
 
     public async ValueTask DisposeAsync()
     {
         if (_disposed)
-        {
             return;
-        }
 
         _disposed = true;
         await _shutdown.CancelAsync().ConfigureAwait(false);
