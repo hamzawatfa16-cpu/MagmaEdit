@@ -1,6 +1,15 @@
 namespace MagmaEdit.PluginHost;
 
-public sealed record PluginDescriptor(string AssemblyPath, MagmaEdit.Plugin.Abstractions.PluginManifest Manifest);
+public sealed record PluginDescriptor(
+    string AssemblyPath,
+    MagmaEdit.Plugin.Abstractions.PluginManifest Manifest,
+    string AssemblySha256)
+{
+    public PluginDescriptor(string assemblyPath, MagmaEdit.Plugin.Abstractions.PluginManifest manifest)
+        : this(assemblyPath, manifest, PluginIntegrity.ComputeSha256(assemblyPath))
+    {
+    }
+}
 
 public sealed record PluginDiscoveryIssue(string AssemblyPath, string Message);
 
@@ -83,5 +92,21 @@ public sealed class PluginCatalog
         }
 
         return new PluginDiscoveryResult(plugins, issues);
+    }
+}
+
+internal static class PluginIntegrity
+{
+    public static string ComputeSha256(string assemblyPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(assemblyPath);
+        string fullAssemblyPath = Path.GetFullPath(assemblyPath);
+        if (!File.Exists(fullAssemblyPath))
+        {
+            throw new FileNotFoundException("Plugin assembly was not found.", fullAssemblyPath);
+        }
+
+        using FileStream stream = File.OpenRead(fullAssemblyPath);
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream));
     }
 }
