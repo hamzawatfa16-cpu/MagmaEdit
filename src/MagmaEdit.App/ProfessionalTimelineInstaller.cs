@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.VisualTree;
 
@@ -27,9 +28,9 @@ internal static class ProfessionalTimelineInstaller
             window.SetStatusForGallery);
     }
 
-    private static Border? FindParentBorder(Visual visual)
+    private static Border? FindParentBorder(Avalonia.Visual visual)
     {
-        Visual? current = visual;
+        Avalonia.Visual? current = visual;
         while (current is not null)
         {
             if (current is Border border)
