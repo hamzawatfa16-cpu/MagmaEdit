@@ -108,7 +108,7 @@ internal sealed class ProfessionalTimelineView : UserControl
         Content = BuildLayout();
     }
 
-    private Control BuildLayout()
+    private Grid BuildLayout()
     {
         var root = new Grid
         {
