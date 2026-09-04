@@ -1,0 +1,1 @@
+PR #6 establishes the vendor-neutral durable-session transport boundary. The current registry is intentionally in-memory for development and tests; production deployment requires durable shared session state and authenticated outbound desktop connectivity.
