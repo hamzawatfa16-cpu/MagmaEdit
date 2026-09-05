@@ -14,7 +14,6 @@ public sealed class AuthenticatedMagmaEditDesktopRelayClient : IAsyncDisposable
     private readonly Func<LiveEditorPipeRequest, CancellationToken, Task<LiveEditorPipeResponse>> _requestHandler;
     private readonly TimeSpan _retryDelay;
     private readonly CancellationTokenSource _shutdown = new();
-    private readonly Task _runTask;
     private int _disposed;
 
     public AuthenticatedMagmaEditDesktopRelayClient(
@@ -43,6 +42,7 @@ public sealed class AuthenticatedMagmaEditDesktopRelayClient : IAsyncDisposable
         Func<MagmaEditSessionDescriptor?> currentSessionProvider,
         CancellationToken cancellationToken = default)
     {
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
         ArgumentNullException.ThrowIfNull(currentSessionProvider);
         return RunCoreAsync(currentSessionProvider, cancellationToken);
     }
@@ -83,11 +83,25 @@ public sealed class AuthenticatedMagmaEditDesktopRelayClient : IAsyncDisposable
             {
                 break;
             }
-            catch (Exception exception) when (exception is WebSocketException or IOException or InvalidDataException or HttpRequestException)
+            catch (WebSocketException)
             {
-                StartupDiagnostics.WriteComponentFailure("desktop broker relay", exception);
                 await DelayAsync(delay, token).ConfigureAwait(false);
-                delay = TimeSpan.FromTicks(Math.Min(MaxRetryDelay.Ticks, delay.Ticks * 2));
+                delay = NextDelay(delay);
+            }
+            catch (HttpRequestException)
+            {
+                await DelayAsync(delay, token).ConfigureAwait(false);
+                delay = NextDelay(delay);
+            }
+            catch (IOException)
+            {
+                await DelayAsync(delay, token).ConfigureAwait(false);
+                delay = NextDelay(delay);
+            }
+            catch (InvalidDataException)
+            {
+                await DelayAsync(delay, token).ConfigureAwait(false);
+                delay = NextDelay(delay);
             }
         }
     }
@@ -196,6 +210,9 @@ public sealed class AuthenticatedMagmaEditDesktopRelayClient : IAsyncDisposable
         string normalizedBase = basePath.TrimEnd('/');
         return $"{normalizedBase}/{childPath.TrimStart('/')}";
     }
+
+    private static TimeSpan NextDelay(TimeSpan current) =>
+        TimeSpan.FromTicks(Math.Min(MaxRetryDelay.Ticks, current.Ticks * 2));
 
     private static async Task DelayAsync(TimeSpan delay, CancellationToken cancellationToken)
     {
