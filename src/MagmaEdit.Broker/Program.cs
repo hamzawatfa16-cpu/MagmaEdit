@@ -1,10 +1,12 @@
 using System.Net.Http.Headers;
+using System.Net.WebSockets;
 using MagmaEdit.Broker;
 using MagmaEdit.Integration;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
+builder.Services.AddSingleton<MagmaEditDesktopRelayHub>();
 
 string? supabaseUrl = Environment.GetEnvironmentVariable("MAGMAEDIT_SUPABASE_URL");
 string? publishableKey = Environment.GetEnvironmentVariable("MAGMAEDIT_SUPABASE_PUBLISHABLE_KEY");
@@ -46,6 +48,7 @@ else
 builder.Services.AddSingleton<MagmaEditSessionBroker>();
 
 WebApplication app = builder.Build();
+app.UseWebSockets();
 
 app.MapGet("/health", () => Results.Ok(new
 {
@@ -152,6 +155,84 @@ app.MapPost("/v1/desktop-sessions/revoke", (
     return Results.Ok(new UnregisterResponse(removed));
 });
 
+app.Map("/v1/desktop-sessions/connect", async (
+    HttpContext context,
+    IMagmaEditBrokerCredentialStore credentialStore,
+    IMagmaEditBrokerReplayProtector replayProtector,
+    MagmaEditSessionBroker broker,
+    MagmaEditDesktopRelayHub relayHub,
+    TimeProvider timeProvider,
+    CancellationToken cancellationToken) =>
+{
+    if (!context.WebSockets.IsWebSocketRequest)
+    {
+        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+        return;
+    }
+
+    string userId = context.Request.Query["userId"].ToString().Trim();
+    string sessionId = context.Request.Query["sessionId"].ToString().Trim();
+    if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(sessionId))
+    {
+        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+        return;
+    }
+
+    if (!TryAuthorizeWebSocketRequest(context.Request, userId, sessionId, credentialStore, replayProtector, broker, timeProvider, out int failureStatus))
+    {
+        context.Response.StatusCode = failureStatus;
+        return;
+    }
+
+    using WebSocket socket = await context.WebSockets.AcceptWebSocketAsync().ConfigureAwait(false);
+    await relayHub.RunDesktopConnectionAsync(userId, sessionId, socket, cancellationToken).ConfigureAwait(false);
+});
+
+app.MapPost("/v1/desktop-sessions/relay", async (
+    HttpRequest request,
+    RelayEnvelope envelope,
+    IMagmaEditBrokerCredentialStore credentialStore,
+    IMagmaEditBrokerReplayProtector replayProtector,
+    MagmaEditSessionBroker broker,
+    MagmaEditDesktopRelayHub relayHub,
+    TimeProvider timeProvider,
+    CancellationToken cancellationToken) =>
+{
+    if (!TryAuthorizeSessionRequest(request, envelope.UserId, envelope.SessionId, credentialStore, replayProtector, timeProvider, out IResult? failure))
+    {
+        return failure!;
+    }
+
+    if (!broker.TryGet(envelope.UserId, timeProvider.GetUtcNow(), out MagmaEditSessionDescriptor? descriptor)
+        || descriptor is null
+        || !string.Equals(descriptor.SessionId, envelope.SessionId, StringComparison.Ordinal))
+    {
+        return Results.NotFound();
+    }
+
+    try
+    {
+        LiveEditorPipeResponse response = await relayHub.RelayAsync(
+            envelope.UserId,
+            envelope.SessionId,
+            envelope.Request with
+            {
+                UserId = envelope.UserId,
+                SessionId = envelope.SessionId
+            },
+            cancellationToken).ConfigureAwait(false);
+        return Results.Ok(response);
+    }
+    catch (InvalidOperationException exception)
+    {
+        return Results.NotFound(new { error = exception.Message });
+    }
+    catch (TimeoutException)
+    {
+        return Results.StatusCode(StatusCodes.Status504GatewayTimeout);
+    }
+});
+
 app.Run();
 
 static IResult ExecuteAuthenticated(
@@ -228,6 +309,50 @@ static bool TryAuthorizeSessionRequest(
     return true;
 }
 
+static bool TryAuthorizeWebSocketRequest(
+    HttpRequest request,
+    string userId,
+    string sessionId,
+    IMagmaEditBrokerCredentialStore credentialStore,
+    IMagmaEditBrokerReplayProtector replayProtector,
+    MagmaEditSessionBroker broker,
+    TimeProvider timeProvider,
+    out int failureStatus)
+{
+    failureStatus = StatusCodes.Status401Unauthorized;
+    if (!TryGetBearerToken(request, out string accessToken)
+        || !credentialStore.TryAuthenticate(accessToken, timeProvider.GetUtcNow(), out string? credentialUserId)
+        || credentialUserId is null)
+    {
+        return false;
+    }
+
+    if (!string.Equals(credentialUserId, userId, StringComparison.Ordinal))
+    {
+        failureStatus = StatusCodes.Status403Forbidden;
+        return false;
+    }
+
+    if (!broker.TryGet(userId, timeProvider.GetUtcNow(), out MagmaEditSessionDescriptor? descriptor)
+        || descriptor is null
+        || !string.Equals(descriptor.SessionId, sessionId, StringComparison.Ordinal))
+    {
+        failureStatus = StatusCodes.Status404NotFound;
+        return false;
+    }
+
+    if (!replayProtector.TryAccept(
+        request.Headers["X-MagmaEdit-Request-Id"].ToString(),
+        request.Headers["X-MagmaEdit-Timestamp"].ToString(),
+        timeProvider.GetUtcNow()))
+    {
+        failureStatus = StatusCodes.Status409Conflict;
+        return false;
+    }
+
+    return true;
+}
+
 static bool TryGetBearerToken(HttpRequest request, out string accessToken)
 {
     accessToken = string.Empty;
@@ -242,3 +367,9 @@ static bool TryGetBearerToken(HttpRequest request, out string accessToken)
     accessToken = header.Parameter.Trim();
     return true;
 }
+
+sealed record RegistrationEnvelope(MagmaEditSessionRegistration Registration);
+sealed record RenewalEnvelope(string UserId, string SessionId, TimeSpan LeaseDuration);
+sealed record RevokeEnvelope(string UserId, string SessionId);
+sealed record UnregisterResponse(bool Removed);
+sealed record RelayEnvelope(string UserId, string SessionId, LiveEditorPipeRequest Request);
