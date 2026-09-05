@@ -5,7 +5,22 @@ using MagmaEdit.Integration;
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
-builder.Services.AddSingleton<IMagmaEditPrimaryIdentityValidator, RejectingPrimaryIdentityValidator>();
+
+string? supabaseUrl = Environment.GetEnvironmentVariable("MAGMAEDIT_SUPABASE_URL");
+string? publishableKey = Environment.GetEnvironmentVariable("MAGMAEDIT_SUPABASE_PUBLISHABLE_KEY");
+if (!string.IsNullOrWhiteSpace(supabaseUrl) && !string.IsNullOrWhiteSpace(publishableKey))
+{
+    SupabasePrimaryIdentityValidatorOptions options = new(supabaseUrl, publishableKey);
+    builder.Services.AddSingleton(options);
+    builder.Services.AddHttpClient<SupabasePrimaryIdentityValidator>();
+    builder.Services.AddSingleton<IMagmaEditPrimaryIdentityValidator>(serviceProvider =>
+        serviceProvider.GetRequiredService<SupabasePrimaryIdentityValidator>());
+}
+else
+{
+    builder.Services.AddSingleton<IMagmaEditPrimaryIdentityValidator, RejectingPrimaryIdentityValidator>();
+}
+
 builder.Services.AddSingleton<IMagmaEditBrokerCredentialStore, InMemoryMagmaEditBrokerCredentialStore>();
 builder.Services.AddSingleton<InMemoryMagmaEditReplayProtector>();
 builder.Services.AddSingleton<MagmaEditSessionBroker>();
