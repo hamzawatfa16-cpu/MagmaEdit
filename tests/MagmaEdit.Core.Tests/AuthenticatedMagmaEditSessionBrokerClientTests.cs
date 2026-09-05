@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -25,13 +26,17 @@ public sealed class AuthenticatedMagmaEditSessionBrokerClientTests
         MagmaEditSessionDescriptor actual = await client.RegisterAsync(CreateRegistration());
 
         Assert.Equal(expected, actual);
-        Assert.Equal(HttpMethod.Post, handler.Request.Method);
-        Assert.Equal("https://broker.example.test/v1/desktop-sessions/register", handler.Request.RequestUri!.ToString());
-        Assert.Equal("Bearer", handler.Request.Headers.Authorization!.Scheme);
-        Assert.Equal("secret-token", handler.Request.Headers.Authorization.Parameter);
-        Assert.True(handler.Request.Headers.Contains("X-MagmaEdit-Request-Id"));
-        Assert.True(handler.Request.Headers.Contains("X-MagmaEdit-Timestamp"));
-        Assert.Equal(now.ToUnixTimeSeconds().ToString(), handler.Request.Headers.GetValues("X-MagmaEdit-Timestamp").Single());
+        HttpRequestMessage request = Assert.IsType<HttpRequestMessage>(handler.Request);
+        Assert.Equal(HttpMethod.Post, request.Method);
+        Assert.Equal("https://broker.example.test/v1/desktop-sessions/register", request.RequestUri!.ToString());
+        Assert.NotNull(request.Headers.Authorization);
+        Assert.Equal("Bearer", request.Headers.Authorization.Scheme);
+        Assert.Equal("secret-token", request.Headers.Authorization.Parameter);
+        Assert.True(request.Headers.Contains("X-MagmaEdit-Request-Id"));
+        Assert.True(request.Headers.Contains("X-MagmaEdit-Timestamp"));
+        Assert.Equal(
+            now.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture),
+            request.Headers.GetValues("X-MagmaEdit-Timestamp").Single());
     }
 
     [Fact]
