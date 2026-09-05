@@ -25,7 +25,12 @@ public sealed class AuthenticatedMagmaEditSessionBrokerClientTests
 
         MagmaEditSessionDescriptor actual = await client.RegisterAsync(CreateRegistration());
 
-        Assert.Equal(expected, actual);
+        Assert.Equal(expected.UserId, actual.UserId);
+        Assert.Equal(expected.SessionId, actual.SessionId);
+        Assert.Equal(expected.ConnectionId, actual.ConnectionId);
+        Assert.Equal(expected.Endpoint, actual.Endpoint);
+        Assert.Equal(expected.ExpiresAt, actual.ExpiresAt);
+        Assert.Equal(expected.Capabilities, actual.Capabilities);
         HttpRequestMessage request = Assert.IsType<HttpRequestMessage>(handler.Request);
         Assert.Equal(HttpMethod.Post, request.Method);
         Assert.Equal("https://broker.example.test/v1/desktop-sessions/register", request.RequestUri!.ToString());
