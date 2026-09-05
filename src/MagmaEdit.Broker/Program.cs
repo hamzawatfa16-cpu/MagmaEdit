@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Net.WebSockets;
 using MagmaEdit.Broker;
 using MagmaEdit.Integration;
 
