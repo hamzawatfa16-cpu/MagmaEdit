@@ -21,8 +21,28 @@ else
     builder.Services.AddSingleton<IMagmaEditPrimaryIdentityValidator, RejectingPrimaryIdentityValidator>();
 }
 
-builder.Services.AddSingleton<IMagmaEditBrokerCredentialStore, InMemoryMagmaEditBrokerCredentialStore>();
-builder.Services.AddSingleton<InMemoryMagmaEditReplayProtector>();
+string? brokerDatabaseConnection = Environment.GetEnvironmentVariable("MAGMAEDIT_BROKER_DATABASE_CONNECTION");
+if (!string.IsNullOrWhiteSpace(brokerDatabaseConnection))
+{
+    builder.Services.AddSingleton<IMagmaEditBrokerCredentialStore>(_ =>
+        new PostgresMagmaEditBrokerCredentialStore(brokerDatabaseConnection));
+    builder.Services.AddSingleton<IMagmaEditBrokerReplayProtector>(_ =>
+        new PostgresMagmaEditReplayProtector(brokerDatabaseConnection));
+    builder.Services.AddSingleton<IMagmaEditSessionStore>(_ =>
+        new PostgresMagmaEditSessionStore(brokerDatabaseConnection));
+}
+else if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddSingleton<IMagmaEditBrokerCredentialStore, InMemoryMagmaEditBrokerCredentialStore>();
+    builder.Services.AddSingleton<IMagmaEditBrokerReplayProtector, InMemoryMagmaEditReplayProtector>();
+    builder.Services.AddSingleton<IMagmaEditSessionStore, InMemoryMagmaEditSessionStore>();
+}
+else
+{
+    throw new InvalidOperationException(
+        "MAGMAEDIT_BROKER_DATABASE_CONNECTION is required outside the Development environment.");
+}
+
 builder.Services.AddSingleton<MagmaEditSessionBroker>();
 
 WebApplication app = builder.Build();
@@ -75,7 +95,7 @@ app.MapPost("/v1/desktop-sessions/register", (
     HttpRequest request,
     RegistrationEnvelope envelope,
     IMagmaEditBrokerCredentialStore credentialStore,
-    InMemoryMagmaEditReplayProtector replayProtector,
+    IMagmaEditBrokerReplayProtector replayProtector,
     MagmaEditSessionBroker broker,
     TimeProvider timeProvider) =>
     ExecuteAuthenticated(request, envelope.Registration, credentialStore, replayProtector, broker, timeProvider));
@@ -84,7 +104,7 @@ app.MapPost("/v1/desktop-sessions/renew", (
     HttpRequest request,
     RenewalEnvelope envelope,
     IMagmaEditBrokerCredentialStore credentialStore,
-    InMemoryMagmaEditReplayProtector replayProtector,
+    IMagmaEditBrokerReplayProtector replayProtector,
     MagmaEditSessionBroker broker,
     TimeProvider timeProvider) =>
 {
@@ -119,7 +139,7 @@ app.MapPost("/v1/desktop-sessions/revoke", (
     HttpRequest request,
     RevokeEnvelope envelope,
     IMagmaEditBrokerCredentialStore credentialStore,
-    InMemoryMagmaEditReplayProtector replayProtector,
+    IMagmaEditBrokerReplayProtector replayProtector,
     MagmaEditSessionBroker broker,
     TimeProvider timeProvider) =>
 {
@@ -138,7 +158,7 @@ static IResult ExecuteAuthenticated(
     HttpRequest request,
     MagmaEditSessionRegistration registration,
     IMagmaEditBrokerCredentialStore credentialStore,
-    InMemoryMagmaEditReplayProtector replayProtector,
+    IMagmaEditBrokerReplayProtector replayProtector,
     MagmaEditSessionBroker broker,
     TimeProvider timeProvider)
 {
@@ -170,7 +190,7 @@ static bool TryAuthorizeSessionRequest(
     string userId,
     string sessionId,
     IMagmaEditBrokerCredentialStore credentialStore,
-    InMemoryMagmaEditReplayProtector replayProtector,
+    IMagmaEditBrokerReplayProtector replayProtector,
     TimeProvider timeProvider,
     out IResult? failure)
 {

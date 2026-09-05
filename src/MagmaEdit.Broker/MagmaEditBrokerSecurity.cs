@@ -18,6 +18,11 @@ public interface IMagmaEditBrokerCredentialStore
     bool Revoke(string accessToken, string userId);
 }
 
+public interface IMagmaEditBrokerReplayProtector
+{
+    bool TryAccept(string? requestId, string? timestamp, DateTimeOffset now);
+}
+
 public sealed class InMemoryMagmaEditBrokerCredentialStore : IMagmaEditBrokerCredentialStore
 {
     private sealed record Entry(string UserId, DateTimeOffset ExpiresAt, bool Revoked);
@@ -96,7 +101,7 @@ public sealed class InMemoryMagmaEditBrokerCredentialStore : IMagmaEditBrokerCre
     }
 }
 
-public sealed class InMemoryMagmaEditReplayProtector
+public sealed class InMemoryMagmaEditReplayProtector : IMagmaEditBrokerReplayProtector
 {
     private readonly object _sync = new();
     private readonly Dictionary<string, DateTimeOffset> _seen = new(StringComparer.Ordinal);
