@@ -45,7 +45,7 @@ public sealed class MagmaEditDesktopRelayHub
         }
         finally
         {
-            _connections.TryRemove(new KeyValuePair<string, Connection>(key, connection));
+            _connections.TryRemove(key, out _);
             connection.FailPending(new IOException("The desktop relay connection closed."));
             await CloseAsync(socket, WebSocketCloseStatus.NormalClosure, "Connection closed.").ConfigureAwait(false);
             connection.Dispose();
@@ -82,6 +82,11 @@ public sealed class MagmaEditDesktopRelayHub
                 return;
             }
 
+            if (result.MessageType != WebSocketMessageType.Text)
+            {
+                throw new InvalidDataException("The desktop relay only accepts text messages.");
+            }
+
             message.Write(buffer, 0, result.Count);
             if (!result.EndOfMessage)
             {
@@ -91,7 +96,9 @@ public sealed class MagmaEditDesktopRelayHub
             RelayResponseEnvelope? envelope;
             try
             {
-                envelope = JsonSerializer.Deserialize<RelayResponseEnvelope>(message.GetBuffer().AsSpan(0, checked((int)message.Length)), LiveEditorPipeProtocol.JsonOptions);
+                envelope = JsonSerializer.Deserialize<RelayResponseEnvelope>(
+                    message.GetBuffer().AsSpan(0, checked((int)message.Length)),
+                    LiveEditorPipeProtocol.JsonOptions);
             }
             catch (JsonException exception)
             {
@@ -147,10 +154,7 @@ public sealed class MagmaEditDesktopRelayHub
 
             string correlationId = Guid.NewGuid().ToString("N");
             var completion = new TaskCompletionSource<LiveEditorPipeResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
-            if (!_pending.TryAdd(correlationId, completion))
-            {
-                throw new InvalidOperationException("Could not allocate a relay correlation ID.");
-            }
+            _pending[correlationId] = completion;
 
             try
             {
