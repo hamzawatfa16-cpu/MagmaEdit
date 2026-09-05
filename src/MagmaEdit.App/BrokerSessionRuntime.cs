@@ -3,35 +3,42 @@ using MagmaEdit.Integration;
 
 namespace MagmaEdit.App;
 
-/// <summary>Owns the optional authenticated desktop-to-broker session for the running editor.</summary>
+/// <summary>Owns the optional authenticated desktop-to-broker session and outbound relay for the running editor.</summary>
 public sealed class BrokerSessionRuntime : IAsyncDisposable
 {
     private readonly HttpClient _httpClient;
     private readonly AuthenticatedMagmaEditBrokerCredentialProvider _credentialProvider;
     private readonly MagmaEditDesktopSessionConnectionManager _connectionManager;
+    private readonly AuthenticatedMagmaEditDesktopRelayClient _relayClient;
     private readonly CancellationTokenSource _cancellation = new();
     private readonly Task _runTask;
+    private readonly Task _relayRunTask;
     private int _disposed;
 
     private BrokerSessionRuntime(
         HttpClient httpClient,
         AuthenticatedMagmaEditBrokerCredentialProvider credentialProvider,
-        MagmaEditDesktopSessionConnectionManager connectionManager)
+        MagmaEditDesktopSessionConnectionManager connectionManager,
+        AuthenticatedMagmaEditDesktopRelayClient relayClient)
     {
         _httpClient = httpClient;
         _credentialProvider = credentialProvider;
         _connectionManager = connectionManager;
+        _relayClient = relayClient;
         _runTask = RunAsync();
+        _relayRunTask = _relayClient.RunAsync(() => _connectionManager.CurrentSession, _cancellation.Token);
     }
 
     public MagmaEditDesktopSessionState State => _connectionManager.State;
 
     public static BrokerSessionRuntime Start(
         AuthSession authSession,
-        Func<CancellationToken, ValueTask<string?>> upstreamAccessTokenProvider)
+        Func<CancellationToken, ValueTask<string?>> upstreamAccessTokenProvider,
+        Func<LiveEditorPipeRequest, CancellationToken, Task<LiveEditorPipeResponse>> requestHandler)
     {
         ArgumentNullException.ThrowIfNull(authSession);
         ArgumentNullException.ThrowIfNull(upstreamAccessTokenProvider);
+        ArgumentNullException.ThrowIfNull(requestHandler);
 
         string? brokerUrl = Environment.GetEnvironmentVariable("MAGMAEDIT_BROKER_URL")?.Trim();
         if (string.IsNullOrWhiteSpace(brokerUrl))
@@ -85,8 +92,12 @@ public sealed class BrokerSessionRuntime : IAsyncDisposable
             brokerClient,
             registration,
             heartbeatInterval: TimeSpan.FromMinutes(Math.Min(5, Math.Max(1, leaseMinutes / 3))));
+        var relayClient = new AuthenticatedMagmaEditDesktopRelayClient(
+            brokerUri,
+            credentialProvider,
+            requestHandler);
 
-        return new BrokerSessionRuntime(httpClient, credentialProvider, connectionManager);
+        return new BrokerSessionRuntime(httpClient, credentialProvider, connectionManager, relayClient);
     }
 
     private async Task RunAsync()
@@ -114,7 +125,7 @@ public sealed class BrokerSessionRuntime : IAsyncDisposable
         _cancellation.Cancel();
         try
         {
-            await _runTask.ConfigureAwait(false);
+            await Task.WhenAll(_runTask, _relayRunTask).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -133,6 +144,7 @@ public sealed class BrokerSessionRuntime : IAsyncDisposable
         }
         finally
         {
+            await _relayClient.DisposeAsync().ConfigureAwait(false);
             await _credentialProvider.DisposeAsync().ConfigureAwait(false);
             _httpClient.Dispose();
             _cancellation.Dispose();
