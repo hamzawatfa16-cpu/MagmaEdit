@@ -66,10 +66,13 @@ public sealed class AuthenticatedMagmaEditSessionBrokerClientTests
     public async Task FailedResponseDoesNotReturnBrokerPayloadAsExceptionText()
     {
         DateTimeOffset now = new(2030, 1, 2, 3, 4, 5, TimeSpan.Zero);
-        RecordingHandler handler = new() { Response = new HttpResponseMessage(HttpStatusCode.Unauthorized)
+        RecordingHandler handler = new()
         {
-            Content = JsonContent.Create(new { accessToken = "must-not-leak" })
-        }};
+            Response = new HttpResponseMessage(HttpStatusCode.Unauthorized)
+            {
+                Content = JsonContent.Create(new { accessToken = "must-not-leak" })
+            }
+        };
         using HttpClient httpClient = new(handler);
         AuthenticatedMagmaEditSessionBrokerClient client = new(
             httpClient,
