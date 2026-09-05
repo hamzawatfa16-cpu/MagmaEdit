@@ -76,7 +76,7 @@ public sealed class MagmaEditDesktopRelayHub
         using var message = new MemoryStream();
         while (connection.Socket.State is WebSocketState.Open or WebSocketState.CloseReceived)
         {
-            ValueWebSocketReceiveResult result = await connection.Socket.ReceiveAsync(buffer, cancellationToken).ConfigureAwait(false);
+            WebSocketReceiveResult result = await connection.Socket.ReceiveAsync(buffer, cancellationToken).ConfigureAwait(false);
             if (result.MessageType == WebSocketMessageType.Close)
             {
                 return;
