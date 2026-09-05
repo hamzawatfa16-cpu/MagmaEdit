@@ -69,7 +69,7 @@ public sealed class MagmaEditDesktopSessionConnectionManagerTests
         await using var manager = new MagmaEditDesktopSessionConnectionManager(
             broker,
             registration,
-            heartbeatInterval: TimeSpan.FromSeconds(1));
+            heartbeatInterval: TimeSpan.FromMilliseconds(100));
         using var cancellation = new CancellationTokenSource();
 
         Task run = manager.RunAsync(cancellation.Token);
