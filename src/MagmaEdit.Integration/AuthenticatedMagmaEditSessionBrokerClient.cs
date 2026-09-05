@@ -126,8 +126,8 @@ public sealed class AuthenticatedMagmaEditSessionBrokerClient : IMagmaEditSessio
         return result ?? throw new InvalidOperationException("The broker returned an empty or invalid response.");
     }
 
-    private static Exception CreateTransportException(HttpStatusCode statusCode, string responseBody) =>
-        new HttpRequestException(
+    private static HttpRequestException CreateTransportException(HttpStatusCode statusCode, string responseBody) =>
+        new(
             $"The MagmaEdit session broker rejected the request with HTTP {(int)statusCode} ({statusCode}).",
             null,
             statusCode);
