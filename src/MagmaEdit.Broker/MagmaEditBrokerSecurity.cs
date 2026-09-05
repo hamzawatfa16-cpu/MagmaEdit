@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -112,12 +113,22 @@ public sealed class InMemoryMagmaEditReplayProtector
 
     public bool TryAccept(string? requestId, string? timestamp, DateTimeOffset now)
     {
-        if (string.IsNullOrWhiteSpace(requestId) || !long.TryParse(timestamp, out long unixSeconds))
+        if (string.IsNullOrWhiteSpace(requestId)
+            || !long.TryParse(timestamp, NumberStyles.Integer, CultureInfo.InvariantCulture, out long unixSeconds))
         {
             return false;
         }
 
-        DateTimeOffset requestTime = DateTimeOffset.FromUnixTimeSeconds(unixSeconds);
+        DateTimeOffset requestTime;
+        try
+        {
+            requestTime = DateTimeOffset.FromUnixTimeSeconds(unixSeconds);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return false;
+        }
+
         if (requestTime < now.Subtract(_clockSkew) || requestTime > now.Add(_clockSkew))
         {
             return false;
