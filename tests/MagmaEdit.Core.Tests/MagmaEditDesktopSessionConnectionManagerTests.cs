@@ -1,3 +1,4 @@
+using System.Net;
 using MagmaEdit.Integration;
 
 namespace MagmaEdit.Core.Tests;
@@ -43,9 +44,46 @@ public sealed class MagmaEditDesktopSessionConnectionManagerTests
     }
 
     [Fact]
+    public async Task HttpRegistrationFailureRetriesWithoutFaultingLoop()
+    {
+        var broker = new FakeSessionBrokerClient { FailRegistrationsWithHttp = 1 };
+        MagmaEditSessionRegistration registration = CreateRegistration();
+        await using var manager = new MagmaEditDesktopSessionConnectionManager(
+            broker,
+            registration,
+            heartbeatInterval: TimeSpan.FromMilliseconds(50),
+            retryDelay: TimeSpan.FromMilliseconds(5));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(120));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => manager.RunAsync(cancellation.Token));
+
+        Assert.True(broker.RegisterCount >= 2);
+        Assert.Equal(MagmaEditDesktopSessionState.Connected, manager.State);
+    }
+
+    [Fact]
     public async Task FailedRenewalCausesReconnect()
     {
         var broker = new FakeSessionBrokerClient { FailRenewals = 1 };
+        MagmaEditSessionRegistration registration = CreateRegistration();
+        await using var manager = new MagmaEditDesktopSessionConnectionManager(
+            broker,
+            registration,
+            heartbeatInterval: TimeSpan.FromMilliseconds(20),
+            retryDelay: TimeSpan.FromMilliseconds(5));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(140));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => manager.RunAsync(cancellation.Token));
+
+        Assert.True(broker.RegisterCount >= 2);
+        Assert.True(broker.RenewCount >= 1);
+        Assert.Equal(MagmaEditDesktopSessionState.Connected, manager.State);
+    }
+
+    [Fact]
+    public async Task HttpRenewalFailureCausesReconnect()
+    {
+        var broker = new FakeSessionBrokerClient { FailRenewalsWithHttp = 1 };
         MagmaEditSessionRegistration registration = CreateRegistration();
         await using var manager = new MagmaEditDesktopSessionConnectionManager(
             broker,
@@ -109,6 +147,8 @@ public sealed class MagmaEditDesktopSessionConnectionManagerTests
         private readonly MagmaEditSessionBroker _broker = new();
         private int _failRegistrations;
         private int _failRenewals;
+        private int _failRegistrationsWithHttp;
+        private int _failRenewalsWithHttp;
 
         public int FailRegistrations
         {
@@ -120,6 +160,18 @@ public sealed class MagmaEditDesktopSessionConnectionManagerTests
         {
             get => Volatile.Read(ref _failRenewals);
             init => _failRenewals = value;
+        }
+
+        public int FailRegistrationsWithHttp
+        {
+            get => Volatile.Read(ref _failRegistrationsWithHttp);
+            init => _failRegistrationsWithHttp = value;
+        }
+
+        public int FailRenewalsWithHttp
+        {
+            get => Volatile.Read(ref _failRenewalsWithHttp);
+            init => _failRenewalsWithHttp = value;
         }
 
         public int RegisterCount { get; private set; }
@@ -140,6 +192,12 @@ public sealed class MagmaEditDesktopSessionConnectionManagerTests
                     throw new IOException("simulated registration failure");
                 }
 
+                if (Volatile.Read(ref _failRegistrationsWithHttp) > 0)
+                {
+                    Interlocked.Decrement(ref _failRegistrationsWithHttp);
+                    throw new HttpRequestException("simulated HTTP registration failure", null, HttpStatusCode.ServiceUnavailable);
+                }
+
                 return Task.FromResult(_broker.Register(registration, DateTimeOffset.UtcNow));
             }
         }
@@ -158,6 +216,12 @@ public sealed class MagmaEditDesktopSessionConnectionManagerTests
                 {
                     Interlocked.Decrement(ref _failRenewals);
                     throw new IOException("simulated renewal failure");
+                }
+
+                if (Volatile.Read(ref _failRenewalsWithHttp) > 0)
+                {
+                    Interlocked.Decrement(ref _failRenewalsWithHttp);
+                    throw new HttpRequestException("simulated HTTP renewal failure", null, HttpStatusCode.ServiceUnavailable);
                 }
 
                 _broker.TryRenew(userId, sessionId, leaseDuration, DateTimeOffset.UtcNow, out MagmaEditSessionDescriptor? renewed);
