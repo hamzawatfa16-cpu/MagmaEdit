@@ -114,9 +114,13 @@ public sealed class App : Application, IAsyncDisposable
             return;
         }
 
+        LiveEditorPipeServer liveEditorPipeServer = _liveEditorPipeServer
+            ?? throw new InvalidOperationException("Live editor IPC must be initialized before the broker relay.");
+
         _brokerSessionRuntime = BrokerSessionRuntime.Start(
             session,
-            cancellationToken => ValueTask.FromResult<string?>(_authService?.CurrentSession?.AccessToken));
+            cancellationToken => ValueTask.FromResult<string?>(_authService?.CurrentSession?.AccessToken),
+            liveEditorPipeServer.ProcessRequestAsync);
     }
 
     private static IAuthService CreateAuthService()
