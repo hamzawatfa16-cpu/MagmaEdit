@@ -1,7 +1,4 @@
-using System.Globalization;
-using System.Net;
 using System.Net.Http.Headers;
-using System.Text.Json;
 using MagmaEdit.Broker;
 using MagmaEdit.Integration;
 
@@ -93,11 +90,11 @@ app.MapPost("/v1/desktop-sessions/renew", (
             ? Results.Ok(descriptor)
             : Results.NotFound();
     }
-    catch (ArgumentException exception)
+    catch (ArgumentOutOfRangeException exception)
     {
         return Results.BadRequest(new { error = exception.Message });
     }
-    catch (ArgumentOutOfRangeException exception)
+    catch (ArgumentException exception)
     {
         return Results.BadRequest(new { error = exception.Message });
     }
@@ -139,11 +136,11 @@ static IResult ExecuteAuthenticated(
     {
         return Results.Ok(broker.Register(registration, timeProvider.GetUtcNow()));
     }
-    catch (ArgumentException exception)
+    catch (ArgumentOutOfRangeException exception)
     {
         return Results.BadRequest(new { error = exception.Message });
     }
-    catch (ArgumentOutOfRangeException exception)
+    catch (ArgumentException exception)
     {
         return Results.BadRequest(new { error = exception.Message });
     }
