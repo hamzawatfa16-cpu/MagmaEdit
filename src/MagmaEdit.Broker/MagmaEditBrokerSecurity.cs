@@ -96,7 +96,7 @@ public sealed class InMemoryMagmaEditBrokerCredentialStore : IMagmaEditBrokerCre
     }
 }
 
-public sealed class InMemoryMagmaEditReplayProtector
+public sealed class InMemoryMagmaEditReplayProtector : IMagmaEditBrokerReplayProtector
 {
     private readonly object _sync = new();
     private readonly Dictionary<string, DateTimeOffset> _seen = new(StringComparer.Ordinal);
