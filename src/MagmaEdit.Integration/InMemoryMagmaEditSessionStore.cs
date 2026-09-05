@@ -28,7 +28,9 @@ public sealed class InMemoryMagmaEditSessionStore : IMagmaEditSessionStore
         {
             if (_sessions.TryGetValue(descriptor.UserId, out MagmaEditSessionDescriptor? existing))
             {
-                if (existing.ExpiresAt <= now)
+                if (existing.ExpiresAt <= now ||
+                    (string.Equals(existing.SessionId, descriptor.SessionId, StringComparison.Ordinal) &&
+                     string.Equals(existing.ConnectionId, descriptor.ConnectionId, StringComparison.Ordinal)))
                 {
                     if (_sessions.TryUpdate(descriptor.UserId, descriptor, existing))
                     {
