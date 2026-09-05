@@ -136,6 +136,11 @@ public sealed class MagmaEditDesktopSessionConnectionManager : IAsyncDisposable
             SetState(MagmaEditDesktopSessionState.Reconnecting);
             return null;
         }
+        catch (HttpRequestException)
+        {
+            SetState(MagmaEditDesktopSessionState.Reconnecting);
+            return null;
+        }
     }
 
     private async Task<bool> RunHeartbeatAsync(CancellationToken cancellationToken)
@@ -176,6 +181,11 @@ public sealed class MagmaEditDesktopSessionConnectionManager : IAsyncDisposable
                 return true;
             }
             catch (IOException)
+            {
+                SetState(MagmaEditDesktopSessionState.Reconnecting);
+                return true;
+            }
+            catch (HttpRequestException)
             {
                 SetState(MagmaEditDesktopSessionState.Reconnecting);
                 return true;
