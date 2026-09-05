@@ -23,5 +23,6 @@
     <ProjectReference Include="../../src/MagmaEdit.PluginHost/MagmaEdit.PluginHost.csproj" />
     <ProjectReference Include="../MagmaEdit.PluginHost.TestPlugin/MagmaEdit.PluginHost.TestPlugin.csproj" />
     <ProjectReference Include="../../src/MagmaEdit.AiBridge/MagmaEdit.AiBridge.csproj" />
+    <ProjectReference Include="../../src/MagmaEdit.Broker/MagmaEdit.Broker.csproj" />
   </ItemGroup>
 </Project>
