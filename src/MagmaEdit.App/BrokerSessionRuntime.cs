@@ -51,7 +51,8 @@ public sealed class BrokerSessionRuntime : IAsyncDisposable
         if (string.IsNullOrWhiteSpace(endpoint)
             || !Uri.TryCreate(endpoint, UriKind.Absolute, out Uri? endpointUri)
             || endpointUri is null
-            || (endpointUri.Scheme is not Uri.UriSchemeHttps and not "wss"))
+            || (!string.Equals(endpointUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(endpointUri.Scheme, "wss", StringComparison.OrdinalIgnoreCase)))
         {
             throw new InvalidOperationException(
                 "MAGMAEDIT_DESKTOP_ENDPOINT must be an absolute HTTPS or WSS URL when broker connectivity is enabled.");
