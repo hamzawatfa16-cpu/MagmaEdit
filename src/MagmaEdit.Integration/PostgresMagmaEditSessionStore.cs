@@ -41,6 +41,8 @@ public sealed class PostgresMagmaEditSessionStore : IMagmaEditSessionStore
                 capabilities = EXCLUDED.capabilities,
                 updated_at = EXCLUDED.updated_at
             WHERE {TableName}.expires_at <= @now
+               OR ({TableName}.session_id = EXCLUDED.session_id
+                   AND {TableName}.connection_id = EXCLUDED.connection_id)
             RETURNING user_id, session_id, connection_id, endpoint, expires_at, capabilities;
             """;
         command.Parameters.AddWithValue("user_id", userId);
