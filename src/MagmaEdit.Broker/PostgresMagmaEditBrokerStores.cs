@@ -29,6 +29,11 @@ public sealed class PostgresMagmaEditBrokerCredentialStore : IMagmaEditBrokerCre
         DateTimeOffset expiresAt = now.Add(lifetime);
 
         using NpgsqlConnection connection = OpenConnection();
+        using NpgsqlCommand cleanup = connection.CreateCommand();
+        cleanup.CommandText = $"DELETE FROM {TableName} WHERE expires_at <= @now OR revoked_at IS NOT NULL;";
+        cleanup.Parameters.AddWithValue("now", now);
+        cleanup.ExecuteNonQuery();
+
         using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = $"""
             INSERT INTO {TableName} (token_hash, user_id, expires_at, revoked_at, created_at)
@@ -173,9 +178,4 @@ public sealed class PostgresMagmaEditReplayProtector : IMagmaEditBrokerReplayPro
         connection.Open();
         return connection;
     }
-}
-
-public interface IMagmaEditBrokerReplayProtector
-{
-    bool TryAccept(string? requestId, string? timestamp, DateTimeOffset now);
 }
