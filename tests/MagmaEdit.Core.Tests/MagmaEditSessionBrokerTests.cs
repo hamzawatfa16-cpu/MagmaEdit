@@ -20,6 +20,23 @@ public sealed class MagmaEditSessionBrokerTests
     }
 
     [Fact]
+    public void RegisterSameSessionAndConnectionRefreshesLease()
+    {
+        var broker = new MagmaEditSessionBroker();
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        MagmaEditSessionRegistration registration = CreateRegistration("user-a", "session-a", TimeSpan.FromMinutes(5));
+        MagmaEditSessionDescriptor first = broker.Register(registration, now);
+
+        MagmaEditSessionDescriptor refreshed = broker.Register(
+            registration with { LeaseDuration = TimeSpan.FromMinutes(15) },
+            now.AddMinutes(1));
+
+        Assert.Equal(first.UserId, refreshed.UserId);
+        Assert.Equal(first.SessionId, refreshed.SessionId);
+        Assert.Equal(now.AddMinutes(16), refreshed.ExpiresAt);
+    }
+
+    [Fact]
     public void RegisterRejectsSecondActiveSessionForSameUser()
     {
         var broker = new MagmaEditSessionBroker();
