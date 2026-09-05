@@ -65,20 +65,35 @@ internal sealed class LiveEditorPipeServer : IAsyncDisposable
         string? requestJson = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
         LiveEditorPipeResponse response = string.IsNullOrWhiteSpace(requestJson)
             ? Failure("The live editor pipe received an empty request.")
-            : await ProcessRequestAsync(requestJson, cancellationToken).ConfigureAwait(false);
+            : await ProcessRequestJsonAsync(requestJson, cancellationToken).ConfigureAwait(false);
 
         string json = JsonSerializer.Serialize(response, LiveEditorPipeProtocol.JsonOptions);
         await writer.WriteLineAsync(json).ConfigureAwait(false);
     }
 
-    private async Task<LiveEditorPipeResponse> ProcessRequestAsync(string requestJson, CancellationToken cancellationToken)
+    private async Task<LiveEditorPipeResponse> ProcessRequestJsonAsync(string requestJson, CancellationToken cancellationToken)
     {
         try
         {
             LiveEditorPipeRequest? request = JsonSerializer.Deserialize<LiveEditorPipeRequest>(requestJson, LiveEditorPipeProtocol.JsonOptions);
-            if (request is null)
-                return Failure("The live editor pipe request was invalid.");
+            return request is null
+                ? Failure("The live editor pipe request was invalid.")
+                : await ProcessRequestAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+        catch (JsonException exception)
+        {
+            return Failure($"Invalid JSON request: {exception.Message}");
+        }
+    }
 
+    internal async Task<LiveEditorPipeResponse> ProcessRequestAsync(
+        LiveEditorPipeRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        try
+        {
             if (!string.Equals(request.ProtocolVersion, LiveEditorPipeProtocol.Version, StringComparison.Ordinal))
                 return Failure($"Unsupported live editor pipe protocol version '{request.ProtocolVersion}'.");
 
@@ -94,10 +109,6 @@ internal sealed class LiveEditorPipeServer : IAsyncDisposable
                 LiveEditorPipeProtocol.GetStateOperation => await GetStateOnUiThreadAsync(cancellationToken).ConfigureAwait(false),
                 _ => Failure($"Unsupported live editor pipe operation '{request.Operation}'.")
             };
-        }
-        catch (JsonException exception)
-        {
-            return Failure($"Invalid JSON request: {exception.Message}");
         }
         catch (ArgumentException exception)
         {
