@@ -12,6 +12,7 @@ public sealed class App : Application, IAsyncDisposable
 {
     private PluginRuntime? _pluginRuntime;
     private LiveEditorPipeServer? _liveEditorPipeServer;
+    private BrokerSessionRuntime? _brokerSessionRuntime;
     private IAuthService? _authService;
 
     public override void Initialize()
@@ -94,10 +95,28 @@ public sealed class App : Application, IAsyncDisposable
                 ?? throw new InvalidOperationException("A signed-in user is required before starting live editor IPC.");
             _liveEditorPipeServer = new LiveEditorPipeServer(window, userId);
         });
+        TryAttach("broker session", StartBrokerSession);
         TryAttach("timeline duplicate shortcut", () => TimelineClipDuplicateShortcutController.Attach(window));
         window.Show();
         previousWindow?.Close();
         TryAttach("professional timeline", () => ProfessionalTimelineInstaller.Attach(window));
+    }
+
+    private void StartBrokerSession()
+    {
+        if (_authService?.CurrentSession is not AuthSession session)
+        {
+            throw new InvalidOperationException("A signed-in user is required before starting the broker session.");
+        }
+
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MAGMAEDIT_BROKER_URL")))
+        {
+            return;
+        }
+
+        _brokerSessionRuntime = BrokerSessionRuntime.Start(
+            session,
+            cancellationToken => ValueTask.FromResult<string?>(_authService?.CurrentSession?.AccessToken));
     }
 
     private static IAuthService CreateAuthService()
@@ -150,6 +169,22 @@ public sealed class App : Application, IAsyncDisposable
 
     private async Task DisposeAppServicesAsync()
     {
+        if (_brokerSessionRuntime is not null)
+        {
+            try
+            {
+                await _brokerSessionRuntime.DisposeAsync();
+            }
+            catch (Exception exception)
+            {
+                StartupDiagnostics.WriteComponentFailure("broker session shutdown", exception);
+            }
+            finally
+            {
+                _brokerSessionRuntime = null;
+            }
+        }
+
         if (_liveEditorPipeServer is not null)
         {
             try
